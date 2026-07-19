@@ -21,6 +21,34 @@ logic or state themselves. Any app, in any language, can be an OpenTourney
 client by implementing against the API contract; that's what makes it a
 standard rather than a library tied to one app's stack.
 
+## v1 scope
+
+The bar for v1 is "run one real event end-to-end," not the full design
+below. Everything else in this doc is real intended scope, just staged —
+see Roadmap at the end for what's deferred and why, and for where a new
+contributor could pick up a self-contained piece of it.
+
+v1 includes:
+
+- Domain model: Event, Pod, Entry, Player reference, Round, Match (all
+  four formats — Swiss/single-elim/double-elim/multi-phase — since
+  pairing generation is known algorithms, not open design work).
+- Operational API, published and documented from day one (see API-first
+  design) — this is core, not deferred, since an undocumented API is
+  what makes a project hard for anyone else to build against.
+- RBAC (Organizer/Scorekeeper/User), with a single standards-based auth
+  mechanism (OIDC) — enough to prove the authorization model works.
+  Additional auth standards (SAML, LDAP) are staged, see Roadmap.
+- A minimal operational UI: setup, pairings, and scoring — functional,
+  not yet the venue-display presentation mode (see Roadmap).
+- Match result reporting with full provenance (`reported_by`,
+  `witnessed_by`, `confirmed_by`) — core to the data model, not
+  deferrable.
+
+Deferred to post-v1 (staged, see Roadmap): additional auth standards,
+the embeddable UI module, presentation-mode display, and the public
+meta/analytics API.
+
 ## API-first design
 
 The HTTP API is the actual product; everything else is a client of it —
@@ -85,9 +113,10 @@ covers:
 - **Setup** — create an event for a given date; add one or many pods to
   it, each with its own game and format type (Swiss, single-elim,
   double-elim, multi-phase).
-- **Pairings** — viewable per round, filterable by pod/game, and in a
-  presentation mode suited to a venue display (e.g. a TV/projector at
-  the event), not just a personal-device view.
+- **Pairings** — viewable per round, filterable by pod/game. **v1** is a
+  standard screen view; a **presentation mode** suited to a venue
+  display (TV/projector) is a staged roadmap item, not required to run
+  an event.
 - **Scoring** — match result entry and adjudication, gated by the RBAC
   roles above (Organizer/Scorekeeper enter or adjudicate; Users see
   their own matches and standings).
@@ -109,8 +138,10 @@ OpenTourney separates *authentication* (who someone is — not its job) from
   authentication — every client integrates with its own auth provider,
   not OpenTourney's. This should be standards-based rather than a
   bespoke token format, so any host's existing identity infrastructure
-  can integrate directly — SSO/OIDC, SAML, and LDAP-backed setups are
-  all expected to work without OpenTourney inventing its own protocol.
+  can integrate directly. **v1 ships OIDC only**, enough to prove the
+  model works end-to-end; SAML and LDAP-backed support are staged as
+  separate, self-contained roadmap items (see Roadmap) rather than
+  built simultaneously with the core.
 - **Authorization (RBAC)**: OpenTourney maps each authenticated identity to
   a role, scoped per event/pod:
   - **Organizer** — create/manage events, pods, and entries.
@@ -125,6 +156,10 @@ OpenTourney separates *authentication* (who someone is — not its job) from
   Scorekeeper role for that pod, not just that someone claimed to.
 
 ## Public meta/analytics access
+
+**Staged as a roadmap item** — depends on the operational API existing
+first and having real event data to aggregate from, and on resolving the
+sample-size question below. Not required for v1.
 
 OpenTourney exposes two distinct API surfaces, not one API with optional
 filtering:
@@ -171,6 +206,7 @@ youth events where players can't or shouldn't be expected to have their
 own mobile devices.
 
 Supported channels (v1, non-exhaustive):
+
 - Verbal report to a scorekeeper (both players present)
 - Signed paper match slip, entered by a scorekeeper (live or batched
   after the round)
@@ -209,17 +245,41 @@ logic or state themselves:
 1. **Instantiate** — create an Event/Pod via the API, mapping the host
    app's own roster/org data to opaque player references.
 2. **Interface** — three options, not mutually exclusive:
-   - **Standalone** — link out to OpenTourney's own hosted UI.
+   - **Standalone** — link out to OpenTourney's own hosted UI. (v1)
+   - **Fully custom** — render a bespoke UI by reading OpenTourney's API
+     directly, using none of its UI. Available from v1, since the API
+     is published and documented from day one.
    - **Embedded module** — mount OpenTourney's operational UI (or scoped
      pieces of it, e.g. just pairings or just scoring) directly inside
-     the host platform's own UI/navigation, so it reads as part of the
-     host app rather than a separate destination.
-   - **Fully custom** — render a bespoke UI by reading OpenTourney's API
-     directly, using none of its UI.
+     the host platform's own UI/navigation. Staged as a roadmap item —
+     needs an actual embed mechanism (e.g. a JS SDK or web component)
+     built and documented as its own piece of work.
 
 The first intended host-app consumer is a check-in/club-management app —
 but OpenTourney has no dependency on it and no knowledge of its data
 model, and works standalone without it.
+
+## Roadmap
+
+Staged, in-scope work after v1 ships — each item is meant to be a
+self-contained enough chunk that a new contributor could pick one up
+without needing to understand or touch the others:
+
+- **SAML support** — additional auth standard alongside v1's OIDC.
+- **LDAP-backed auth support** — same, for LDAP-backed identity setups.
+- **Embeddable UI module** — JS SDK / web component for mounting
+  OpenTourney's UI (or scoped pieces of it) inside a host app.
+- **Presentation mode** — venue-display (TV/projector) view for
+  pairings, beyond v1's standard screen view.
+- **Public meta/analytics API** — the aggregated, PII-free surface
+  described above, including resolving the small-sample
+  re-identification question before anything is exposed publicly.
+- **Federation / cross-instance analysis** — see Non-goals; revisit only
+  once a separate analytics platform exists and there's real demand for
+  it, not before.
+
+This list is intentionally not prioritized/ordered yet — order will
+depend on who shows up wanting to work on what.
 
 ## Open questions
 
