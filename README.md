@@ -87,7 +87,10 @@ OpenTourney separates *authentication* (who someone is — not its job) from
   passes OpenTourney a trusted identity assertion. OpenTourney has no
   accounts, login, or passwords of its own, and never re-implements
   authentication — every client integrates with its own auth provider,
-  not OpenTourney's.
+  not OpenTourney's. This should be standards-based rather than a
+  bespoke token format, so any host's existing identity infrastructure
+  can integrate directly — SSO/OIDC, SAML, and LDAP-backed setups are
+  all expected to work without OpenTourney inventing its own protocol.
 - **Authorization (RBAC)**: OpenTourney maps each authenticated identity to
   a role, scoped per event/pod:
   - **Organizer** — create/manage events, pods, and entries.
@@ -185,8 +188,14 @@ logic or state themselves:
 
 1. **Instantiate** — create an Event/Pod via the API, mapping the host
    app's own roster/org data to opaque player references.
-2. **Interface** — either link/embed OpenTourney's own UI, or render a
-   fully custom UI by reading OpenTourney's API directly.
+2. **Interface** — three options, not mutually exclusive:
+   - **Standalone** — link out to OpenTourney's own hosted UI.
+   - **Embedded module** — mount OpenTourney's operational UI (or scoped
+     pieces of it, e.g. just pairings or just scoring) directly inside
+     the host platform's own UI/navigation, so it reads as part of the
+     host app rather than a separate destination.
+   - **Fully custom** — render a bespoke UI by reading OpenTourney's API
+     directly, using none of its UI.
 
 The first intended host-app consumer is a check-in/club-management app —
 but OpenTourney has no dependency on it and no knowledge of its data
