@@ -27,9 +27,12 @@ standard rather than a library tied to one app's stack.
   service instance for one operator. Federation, cross-instance trust, and
   a shared meta-analytics layer are a possible future phase, not a v1
   requirement.
-- **Not an identity provider.** OpenTourney has no concept of user accounts
-  or auth for players. It accepts opaque player references from whatever
-  system calls it.
+- **Not an authentication provider.** OpenTourney has no accounts, no
+  login, no passwords. It trusts an identity assertion (e.g. a signed
+  token) issued by whatever host system authenticated the caller, and
+  never re-implements that authentication itself. (It does own its own
+  *authorization* model — see RBAC below — that's a different concern
+  from authenticating who someone is.)
 - **Not a full game-rules engine.** OpenTourney doesn't simulate or validate
   gameplay. Deck/game metadata is descriptive (what was played), not
   enforced (whether the deck/plays were legal). Rules-accurate validation,
@@ -45,12 +48,36 @@ standard rather than a library tied to one app's stack.
 - **Entry** — a player's participation in a pod: player reference, game,
   format, and what they're playing (e.g. a decklist), scoped to that pod.
 - **Player reference** — `(player_uuid, source_system)`. Opaque and
-  external. OpenTourney does not own player identity; it just needs a
-  stable reference supplied by the calling system.
+  external. OpenTourney does not authenticate players; it just needs a
+  stable reference supplied by the calling system, which it then binds to
+  a role (see RBAC below).
 - **Round** — a numbered round within a pod, generated according to the
   pod's format.
 - **Match** — a pairing within a round, plus its result (win/loss/tie) and
   reporting provenance.
+
+## Authentication and authorization
+
+OpenTourney separates *authentication* (who someone is — not its job) from
+*authorization* (what they can do within OpenTourney — its job entirely).
+
+- **Authentication**: the calling host system authenticates the user and
+  passes OpenTourney a trusted identity assertion. OpenTourney has no
+  accounts, login, or passwords of its own, and never re-implements
+  authentication — every client integrates with its own auth provider,
+  not OpenTourney's.
+- **Authorization (RBAC)**: OpenTourney maps each authenticated identity to
+  a role, scoped per event/pod:
+  - **Organizer** — create/manage events, pods, and entries.
+  - **Scorekeeper** — act as a trusted witness; enter or adjudicate match
+    results for pods they're assigned to.
+  - **User/Player** — view standings; self-report or confirm their own
+    matches; nothing beyond that.
+
+  This is what makes the reporting/provenance model (below) actually
+  enforceable rather than self-declared: a `witnessed_by` value is only
+  meaningful if OpenTourney can verify the witness genuinely holds the
+  Scorekeeper role for that pod, not just that someone claimed to.
 
 ## Match result reporting
 
