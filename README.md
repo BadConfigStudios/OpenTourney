@@ -21,6 +21,26 @@ logic or state themselves. Any app, in any language, can be an OpenTourney
 client by implementing against the API contract; that's what makes it a
 standard rather than a library tied to one app's stack.
 
+## API-first design
+
+The HTTP API is the actual product; everything else is a client of it —
+including OpenTourney's own operational UI. The reference UI gets no
+private/backend-only access that the published API doesn't also expose.
+If the reference UI needed shortcuts to work, the API wouldn't actually
+be sufficient for third-party clients either, and "open standard" would
+be aspirational rather than true.
+
+This requires, as first-class deliverables (not written after the fact
+once an implementation exists):
+
+- A published, versioned API specification (e.g. OpenAPI/Swagger), kept
+  current with the implementation rather than describing intent.
+- The domain model (below) published as a formal, standard schema — not
+  just prose — so any client can generate types or validate against it
+  directly.
+- Documentation covering both the API and the data model, maintained
+  alongside the code.
+
 ## Non-goals (for now)
 
 - **Not decentralized/federated hosting.** Each deployment is a single
@@ -209,3 +229,5 @@ model, and works standalone without it.
   phase.
 - Minimum sample-size threshold (or other mechanism) before a meta stat
   is exposed on the public API, to avoid small-pod re-identification.
+- API spec format/tooling (e.g. OpenAPI version) and where the published
+  spec/docs are hosted.
