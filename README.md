@@ -97,6 +97,16 @@ fields are filtered out, but because the aggregation boundary between the
 two surfaces means there's nothing to filter: the public API is generated
 from aggregates, not from redacted operational records.
 
+OpenTourney's own responsibility ends at computing and serving these
+aggregates correctly — it has no dashboard, reporting UI, or analytics
+product of its own. Presenting, further aggregating, or trending this
+data is a separate concern for whatever consumes the public API,
+mirroring the same thin-client pattern host apps use on the operational
+side. This also means cross-instance meta analysis (aggregating public
+data across multiple independent OpenTourney deployments) can be built
+entirely outside OpenTourney later, without OpenTourney itself needing to
+solve federation (see Non-goals).
+
 Opaque player references are still stable per-player identifiers even
 without a name attached, and correlating them across matches/events is a
 re-identification risk in its own right — a reason to keep them out of
