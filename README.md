@@ -79,6 +79,35 @@ OpenTourney separates *authentication* (who someone is — not its job) from
   meaningful if OpenTourney can verify the witness genuinely holds the
   Scorekeeper role for that pod, not just that someone claimed to.
 
+## Public meta/analytics access
+
+OpenTourney exposes two distinct API surfaces, not one API with optional
+filtering:
+
+- **Operational API** — private, RBAC-gated (see above). Events, pods,
+  entries, matches, player references. This is where PII-adjacent data
+  lives.
+- **Meta/analytics API** — public, read-only, aggregated. Deck archetype
+  win rates, meta share by format, matchup spreads, and similar
+  statistics, computed server-side from operational data.
+
+The meta API never returns player references, match-level rows, or
+anything else that ties a result to an individual — not because those
+fields are filtered out, but because the aggregation boundary between the
+two surfaces means there's nothing to filter: the public API is generated
+from aggregates, not from redacted operational records.
+
+Opaque player references are still stable per-player identifiers even
+without a name attached, and correlating them across matches/events is a
+re-identification risk in its own right — a reason to keep them out of
+the public surface entirely, not just mask them.
+
+A related risk at small scale: a pod with only a handful of entries can
+make a stat identifying by context alone (e.g. "the one deck that went
+3-0 in a 4-player pod"), even with zero player references in the
+response. Whether/how to gate that (a minimum sample-size threshold
+before a stat is surfaced publicly) is an open question — see below.
+
 ## Match result reporting
 
 Result reporting must support multiple channels, since not every event
@@ -134,3 +163,5 @@ OpenTourney has no dependency on it and no knowledge of its data model.
 - Storage/deployment stack (not yet decided).
 - Whether/when to revisit federation and shared analytics as a later
   phase.
+- Minimum sample-size threshold (or other mechanism) before a meta stat
+  is exposed on the public API, to avoid small-pod re-identification.
