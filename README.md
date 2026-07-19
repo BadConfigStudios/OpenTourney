@@ -268,7 +268,10 @@ without needing to understand or touch the others:
 - **SAML support** — additional auth standard alongside v1's OIDC.
 - **LDAP-backed auth support** — same, for LDAP-backed identity setups.
 - **Embeddable UI module** — JS SDK / web component for mounting
-  OpenTourney's UI (or scoped pieces of it) inside a host app.
+  OpenTourney's UI (or scoped pieces of it) inside a host app. Known
+  interested consumers: club-checkin, PrizeMap.app, possibly twinleafgg
+  — real demand, not speculative, and a good check that the design
+  doesn't assume any one host's auth/UI stack.
 - **Presentation mode** — venue-display (TV/projector) view for
   pairings, beyond v1's standard screen view.
 - **Public meta/analytics API** — the aggregated, PII-free surface
