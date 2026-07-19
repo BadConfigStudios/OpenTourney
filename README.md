@@ -56,6 +56,28 @@ standard rather than a library tied to one app's stack.
 - **Match** — a pairing within a round, plus its result (win/loss/tie) and
   reporting provenance.
 
+## Operational web UI
+
+OpenTourney ships its own first-party, web-driven UI for running an
+event — this is core scope, not optional tooling bolted on later. It
+covers:
+
+- **Setup** — create an event for a given date; add one or many pods to
+  it, each with its own game and format type (Swiss, single-elim,
+  double-elim, multi-phase).
+- **Pairings** — viewable per round, filterable by pod/game, and in a
+  presentation mode suited to a venue display (e.g. a TV/projector at
+  the event), not just a personal-device view.
+- **Scoring** — match result entry and adjudication, gated by the RBAC
+  roles above (Organizer/Scorekeeper enter or adjudicate; Users see
+  their own matches and standings).
+
+This is distinct from the analytics/meta dashboard described below,
+which is explicitly out of scope for OpenTourney itself. A host app can
+still integrate directly against the API for a fully custom experience
+(see Integration model), but OpenTourney's own UI is a complete way to
+run an event on its own, not just a fallback.
+
 ## Authentication and authorization
 
 OpenTourney separates *authentication* (who someone is — not its job) from
@@ -98,14 +120,14 @@ two surfaces means there's nothing to filter: the public API is generated
 from aggregates, not from redacted operational records.
 
 OpenTourney's own responsibility ends at computing and serving these
-aggregates correctly — it has no dashboard, reporting UI, or analytics
-product of its own. Presenting, further aggregating, or trending this
-data is a separate concern for whatever consumes the public API,
-mirroring the same thin-client pattern host apps use on the operational
-side. This also means cross-instance meta analysis (aggregating public
-data across multiple independent OpenTourney deployments) can be built
-entirely outside OpenTourney later, without OpenTourney itself needing to
-solve federation (see Non-goals).
+aggregates correctly — it has no analytics/meta dashboard or trend
+reporting of its own (that's distinct from the operational UI below).
+Presenting, further aggregating, or trending meta data is a separate
+concern for whatever consumes the public API. This also means
+cross-instance meta analysis (aggregating public data across multiple
+independent OpenTourney deployments) can be built entirely outside
+OpenTourney later, without OpenTourney itself needing to solve federation
+(see Non-goals).
 
 Opaque player references are still stable per-player identifiers even
 without a name attached, and correlating them across matches/events is a
@@ -156,16 +178,19 @@ solved here, noted for later).
 
 ## Integration model
 
-Host applications integrate as thin clients only:
+OpenTourney's own operational UI (above) is a complete way to run an
+event without any host app at all. Host applications are optional, and
+when present integrate as thin clients only — never owning tournament
+logic or state themselves:
 
 1. **Instantiate** — create an Event/Pod via the API, mapping the host
    app's own roster/org data to opaque player references.
-2. **Interface** — render UI (scorekeeper screens, standings, brackets) by
-   reading OpenTourney's API.
+2. **Interface** — either link/embed OpenTourney's own UI, or render a
+   fully custom UI by reading OpenTourney's API directly.
 
-No tournament logic or state lives in the host app. The first intended
-consumer is a check-in/club-management app, integrated this way — but
-OpenTourney has no dependency on it and no knowledge of its data model.
+The first intended host-app consumer is a check-in/club-management app —
+but OpenTourney has no dependency on it and no knowledge of its data
+model, and works standalone without it.
 
 ## Open questions
 
