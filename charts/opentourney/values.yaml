@@ -1,5 +1,7 @@
 namespace: opentourney
 
+imagePullSecrets: []
+
 backend:
   image:
     repository: ghcr.io/badconfigstudios/opentourney/backend

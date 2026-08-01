@@ -13,6 +13,34 @@ cluster and real Postgres prior to merge. This is a manual `helm` workflow —
 staging is not managed by Fleet/GitOps (no production release exists yet; that
 lands with the `v0.1.0` cut in Phase 8).
 
+### Prerequisites
+
+Check these before the first `helm upgrade --install` in a namespace — both
+will fail the deploy if unmet, and neither failure is obvious from the error
+alone:
+
+- **Percona PG Operator CRD installed and watching the namespace.** The chart's
+  `PerconaPGCluster` resource (`pgv2.percona.com/v2`) requires the Percona PG
+  Operator v3 CRD to already be installed and watching the target namespace,
+  or `helm upgrade` aborts with "resource mapping not found." Since nothing in
+  Phase 2 actually consumes the database yet (no domain models, no Alembic),
+  a Postgres-less staging bring-up is a valid fallback: add
+  `--set percona.enabled=false` to the `helm upgrade` command below.
+- **GHCR pull credentials for `opentourney/backend` and `opentourney/frontend`.**
+  Neither package exists yet — GHCR creates them private by default on first
+  push. Check whether the target namespace's default ServiceAccount already
+  has a working pull credential:
+
+  ```bash
+  kubectl -n opentourney-staging get sa default -o yaml
+  ```
+
+  and look for `imagePullSecrets`. Also check for a node-level registry
+  credential (e.g. k3s's `/etc/rancher/k3s/registries.yaml`). If neither is
+  present, create a pull secret and pass it to Helm via
+  `--set imagePullSecrets[0].name=<secret-name>` (see
+  `charts/opentourney/values.yaml`'s `imagePullSecrets` key).
+
 ### Namespace & values
 
 - Namespace: `opentourney-staging`
