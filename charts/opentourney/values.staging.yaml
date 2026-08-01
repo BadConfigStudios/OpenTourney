@@ -1,0 +1,23 @@
+namespace: opentourney-staging
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+backend:
+  image:
+    tag: latest
+    pullPolicy: Always
+  replicas: 1
+
+frontend:
+  image:
+    tag: latest
+    pullPolicy: Always
+  replicas: 1
+
+percona:
+  enabled: true
+  clusterName: opentourney-staging-pg
+  pgVersion: "16"
+  storageSize: 1Gi
+  backupStorageSize: 1Gi
