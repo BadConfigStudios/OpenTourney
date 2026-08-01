@@ -1,5 +1,8 @@
 namespace: opentourney-staging
 
+imagePullSecrets:
+  - name: ghcr-pull
+
 backend:
   image:
     tag: latest

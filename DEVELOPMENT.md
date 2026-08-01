@@ -26,20 +26,27 @@ alone:
   Phase 2 actually consumes the database yet (no domain models, no Alembic),
   a Postgres-less staging bring-up is a valid fallback: add
   `--set percona.enabled=false` to the `helm upgrade` command below.
-- **GHCR pull credentials for `opentourney/backend` and `opentourney/frontend`.**
-  Neither package exists yet — GHCR creates them private by default on first
-  push. Check whether the target namespace's default ServiceAccount already
-  has a working pull credential:
+- **GHCR pull secret named `ghcr-pull` in the `opentourney-staging` namespace.**
+  Confirmed required by an actual staging deploy: the cube cluster has no
+  node-level or default-ServiceAccount credential covering brand-new GHCR
+  packages, so the very first deploy failed with `ErrImagePull` /
+  `401 Unauthorized` until a namespaced pull secret was created. (The org's
+  packages default to `internal` visibility on first push, not `private` —
+  visibility didn't matter here; the cluster still needs an explicit
+  credential either way.) `charts/opentourney/values.staging.yaml` already
+  wires `imagePullSecrets: [{name: ghcr-pull}]`, so create the secret once
+  per namespace before the first deploy:
 
   ```bash
-  kubectl -n opentourney-staging get sa default -o yaml
+  kubectl -n opentourney-staging create secret docker-registry ghcr-pull \
+    --docker-server=ghcr.io \
+    --docker-username=<your-github-username> \
+    --docker-password="$(gh auth token)"
   ```
 
-  and look for `imagePullSecrets`. Also check for a node-level registry
-  credential (e.g. k3s's `/etc/rancher/k3s/registries.yaml`). If neither is
-  present, create a pull secret and pass it to Helm via
-  `--set imagePullSecrets[0].name=<secret-name>` (see
-  `charts/opentourney/values.yaml`'s `imagePullSecrets` key).
+  A GitHub token with `write:packages` scope (or `read:packages` for a
+  pull-only credential) works. Skip this if the secret already exists in
+  the namespace.
 
 ### Namespace & values
 
@@ -98,6 +105,11 @@ alone:
 
 ### Known gotchas
 
+- New GHCR packages need an explicit namespaced pull secret (see
+  Prerequisites above) — confirmed via a real staging deploy that neither
+  the cluster's node-level registry config nor the default ServiceAccount
+  cover packages the first time they're pushed, regardless of the package's
+  visibility setting (`internal` vs `private` made no observed difference).
 - Percona PG Operator v3 requires an explicit `spec.backups.pgbackrest` section
   even when backups aren't meaningfully needed for a disposable staging
   environment — omitting it causes the CRD to reject the resource.
