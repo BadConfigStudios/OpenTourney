@@ -1,0 +1,38 @@
+{{- if .Values.percona.enabled }}
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: {{ .Values.percona.clusterName }}
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+spec:
+  crVersion: "3.0.0"
+  image: percona/percona-distribution-postgresql:16-ubi8
+  postgresVersion: {{ .Values.percona.pgVersion | int }}
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.percona.storageSize }}
+  backups:
+    pgbackrest:
+      image: percona/percona-pgbackrest:2.58.0
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: {{ .Values.percona.backupStorageSize }}
+  users:
+    - name: opentourney
+      databases:
+        - opentourney
+      options: "SUPERUSER"
+{{- end }}
