@@ -1,0 +1,25 @@
+namespace: opentourney
+
+backend:
+  image:
+    repository: ghcr.io/badconfigstudios/opentourney/backend
+    tag: latest
+    pullPolicy: Always
+  replicas: 1
+  port: 8000
+
+frontend:
+  image:
+    repository: ghcr.io/badconfigstudios/opentourney/frontend
+    tag: latest
+    pullPolicy: Always
+  replicas: 1
+  port: 80
+
+# Percona PostgreSQL Operator CRD
+percona:
+  enabled: true
+  clusterName: opentourney-pg
+  pgVersion: "16"
+  storageSize: 5Gi
+  backupStorageSize: 5Gi
