@@ -23,6 +23,9 @@ coverage/
 # --- Docs ---
 docs/_build/
 
+# --- Worktrees ---
+.worktrees/
+
 # --- Editors / OS ---
 .DS_Store
 *.swp
