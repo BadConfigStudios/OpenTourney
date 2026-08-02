@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from app.formats.base import Pairing, TournamentFormat
-from app.models import Entry, Round
+from app.models import Entry, MatchResult, Round
 
 WIN_POINTS = 3
 TIE_POINTS = 1
@@ -18,6 +18,35 @@ class SwissFormat(TournamentFormat):
             return _pair_round_one(entries)
 
         raise NotImplementedError("subsequent-round pairing lands in Task 4/5")
+
+
+def _compute_standings(
+    entries: Sequence[Entry], previous_rounds: Sequence[Round]
+) -> tuple[dict, set]:
+    standings = {entry.id: 0 for entry in entries}
+    bye_used = set()
+
+    for round_ in previous_rounds:
+        for match in round_.matches:
+            if match.entry2_id is None:
+                standings[match.entry1_id] = standings.get(match.entry1_id, 0) + WIN_POINTS
+                bye_used.add(match.entry1_id)
+                continue
+
+            if match.result is MatchResult.UNREPORTED:
+                raise ValueError(
+                    f"round {round_.number} has an unreported match; "
+                    "cannot generate the next round"
+                )
+            if match.result is MatchResult.ENTRY1_WIN:
+                standings[match.entry1_id] = standings.get(match.entry1_id, 0) + WIN_POINTS
+            elif match.result is MatchResult.ENTRY2_WIN:
+                standings[match.entry2_id] = standings.get(match.entry2_id, 0) + WIN_POINTS
+            else:
+                standings[match.entry1_id] = standings.get(match.entry1_id, 0) + TIE_POINTS
+                standings[match.entry2_id] = standings.get(match.entry2_id, 0) + TIE_POINTS
+
+    return standings, bye_used
 
 
 def _pair_round_one(entries: Sequence[Entry]) -> list[Pairing]:
