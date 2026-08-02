@@ -116,6 +116,27 @@ def test_compute_standings_raises_on_unreported_match():
         _compute_standings([e1, e2], [round1])
 
 
+def test_compute_standings_raises_on_none_result_not_yet_flushed():
+    e1, e2 = _entry(), _entry()
+    round1 = _round(
+        1,
+        [
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e1.id,
+                entry2_id=e2.id,
+                # no result= passed — simulates an unflushed Match where the
+                # column default (default=MatchResult.UNREPORTED) hasn't
+                # fired yet, so match.result is None rather than UNREPORTED.
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="unreported"):
+        _compute_standings([e1, e2], [round1])
+
+
 def test_round_two_pairs_within_score_groups_by_prior_results():
     e1, e2, e3, e4 = _entry(), _entry(), _entry(), _entry()
     round1 = _round(
@@ -231,3 +252,36 @@ def test_select_bye_entry_skips_lowest_ranked_if_already_used():
 
     # Must return e2 (middle entry), not e1 (top) or e3 (bottom, already used)
     assert chosen.id == e2.id
+
+
+def test_bye_rotates_away_from_round_one_recipient_in_round_two():
+    e1, e2, e3, e4, e5 = _entry(), _entry(), _entry(), _entry(), _entry()
+    round1 = _round(
+        1,
+        [
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e1.id,
+                entry2_id=e2.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e3.id,
+                entry2_id=e4.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+            Match(id=uuid.uuid4(), round_id=uuid.uuid4(), entry1_id=e5.id, entry2_id=None),
+        ],
+    )
+
+    pairings = SwissFormat().generate_round(entries=[e1, e2, e3, e4, e5], previous_rounds=[round1])
+
+    bye_pairings = [p for p in pairings if p.entry2_id is None]
+    assert len(bye_pairings) == 1
+    assert bye_pairings[0].entry1_id != e5.id  # bye must NOT repeat on e5
+    assert bye_pairings[0].table_number is None
+    real_pairings = [p for p in pairings if p.entry2_id is not None]
+    assert sorted(p.table_number for p in real_pairings) == [1, 2]

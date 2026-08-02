@@ -46,18 +46,20 @@ def _compute_standings(
                 bye_used.add(match.entry1_id)
                 continue
 
-            if match.result is MatchResult.UNREPORTED:
-                raise ValueError(
-                    f"round {round_.number} has an unreported match; "
-                    "cannot generate the next round"
-                )
             if match.result is MatchResult.ENTRY1_WIN:
                 standings[match.entry1_id] = standings.get(match.entry1_id, 0) + WIN_POINTS
             elif match.result is MatchResult.ENTRY2_WIN:
                 standings[match.entry2_id] = standings.get(match.entry2_id, 0) + WIN_POINTS
-            else:
+            elif match.result is MatchResult.TIE:
                 standings[match.entry1_id] = standings.get(match.entry1_id, 0) + TIE_POINTS
                 standings[match.entry2_id] = standings.get(match.entry2_id, 0) + TIE_POINTS
+            else:
+                # Catches UNREPORTED and also `None` (an unflushed Match whose
+                # mapped_column default hasn't fired yet at INSERT time) — both
+                # mean this match doesn't have a scoreable result.
+                raise ValueError(
+                    f"round {round_.number} has an unreported match; cannot generate the next round"
+                )
 
     return standings, bye_used
 
@@ -94,6 +96,10 @@ def _pair_remaining(ranked: list, already_paired: set) -> list[Pairing]:
                 for i, candidate in enumerate(remaining)
                 if frozenset({entry1.id, candidate.id}) not in already_paired
             ),
+            # Greedy, no backtracking: an early pairing choice can strand later
+            # entries into an avoidable rematch even when a rematch-free
+            # pairing of the whole round exists. Known limitation, tracked in
+            # https://github.com/BadConfigStudios/OpenTourney/issues/12.
             0,
         )
         entry2 = remaining.pop(partner_index)
