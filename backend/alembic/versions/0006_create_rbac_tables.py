@@ -45,6 +45,11 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_event_organizers_event_id", "event_organizers", ["event_id"])
+    op.create_index(
+        "ix_event_organizers_player_source",
+        "event_organizers",
+        ["player_uuid", "source_system"],
+    )
 
     pod_role_name_enum.create(op.get_bind(), checkfirst=True)
     op.create_table(
@@ -67,9 +72,16 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_pod_roles_pod_id", "pod_roles", ["pod_id"])
+    op.create_index(
+        "ix_pod_roles_player_source",
+        "pod_roles",
+        ["player_uuid", "source_system"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ix_pod_roles_player_source", table_name="pod_roles")
     op.drop_table("pod_roles")
     pod_role_name_enum.drop(op.get_bind(), checkfirst=True)
+    op.drop_index("ix_event_organizers_player_source", table_name="event_organizers")
     op.drop_table("event_organizers")
