@@ -91,6 +91,26 @@ genuine drop-in module in a later MVP, is the real test of whether the
 plugin architecture holds up. It also keeps MVP1's Phase 3/5 scope smaller
 (no decklist-shaped validation to build yet).
 
+## 2026-08-01 — Data-access: SQLAlchemy 2.0 + Alembic
+
+Phase 3 introduces the first DB-backed models (`Event`/`Pod`/`Entry`/
+`Round`/`Match`). SQLAlchemy 2.0 declarative models pair directly with
+Alembic's autogenerate (already named in issue #3's acceptance criteria),
+avoiding hand-written migration diffs. Standard, mature choice for
+FastAPI + Postgres; matches limitless-organizer-tracker/club-checkin
+tooling maturity even though this repo's stack diverges elsewhere.
+
+## 2026-08-01 — Integration-test DB: testcontainers-python
+
+Phase 3's integration tests need a real Postgres, not a mock (per NFR1/TDD
+conventions — integration layers use real/containerized deps). `badconfig-
+runners` confirmed has a docker daemon (see `ci.yml`'s `docker-build` job).
+testcontainers-python spins an ephemeral Postgres per test run via the
+docker socket, giving identical behavior locally and in CI with no
+workflow-level service-container config to keep in sync — chosen over a
+GitHub Actions `services:` Postgres, which would require local devs to
+separately run their own matching Postgres (e.g. docker-compose).
+
 ## 2026-07-19 — MVP1 scope: BO1 only, Organizer-driven registration only
 
 Best-of-three and self-service player registration are both deferred to
