@@ -115,7 +115,7 @@ def test_match_persists_table_number(db_session):
 
 
 def test_match_table_number_defaults_to_null(db_session):
-    pod, entry1, entry2 = _make_pod_with_two_entries(db_session)
+    pod, entry1, _entry2 = _make_pod_with_two_entries(db_session)
     round_ = Round(pod_id=pod.id, number=1)
     db_session.add(round_)
     db_session.flush()
