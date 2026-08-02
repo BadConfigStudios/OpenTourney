@@ -146,7 +146,26 @@ def test_round_two_pairs_within_score_groups_by_prior_results():
 
 
 def test_round_three_avoids_rematches_across_two_prior_rounds():
-    e1, e2, e3, e4 = _entry(), _entry(), _entry(), _entry()
+    e1, e2 = _entry(), _entry()
+    # Pin e3 and e4 UUIDs to ensure e3 sorts before e4 by string comparison
+    # when tied on points, forcing the rematch-skip branch to always execute
+    e3_id = uuid.UUID("00000000-0000-0000-0000-000000000003")
+    e4_id = uuid.UUID("00000000-0000-0000-0000-000000000004")
+    e3 = Entry(
+        id=e3_id,
+        pod_id=uuid.uuid4(),
+        player_uuid=uuid.uuid4(),
+        source_system="test",
+        metadata_={},
+    )
+    e4 = Entry(
+        id=e4_id,
+        pod_id=uuid.uuid4(),
+        player_uuid=uuid.uuid4(),
+        source_system="test",
+        metadata_={},
+    )
+
     round1 = _round(
         1,
         [
@@ -204,10 +223,11 @@ def test_round_three_avoids_rematches_across_two_prior_rounds():
 def test_select_bye_entry_skips_lowest_ranked_if_already_used():
     from app.formats.swiss import _select_bye_entry
 
-    e1, e2 = _entry(), _entry()
-    ranked = [e1, e2]  # e2 is lowest-ranked (last in the list)
-    bye_used = {e2.id}
+    e1, e2, e3 = _entry(), _entry(), _entry()
+    ranked = [e1, e2, e3]  # e3 is lowest-ranked, e2 is middle
+    bye_used = {e3.id}  # lowest-ranked already used
 
     chosen = _select_bye_entry(ranked, bye_used)
 
-    assert chosen.id == e1.id
+    # Must return e2 (middle entry), not e1 (top) or e3 (bottom, already used)
+    assert chosen.id == e2.id
