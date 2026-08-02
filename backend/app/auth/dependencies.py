@@ -15,14 +15,14 @@ from app.models.rbac import EventOrganizer, PodRole
 _bearer_scheme = HTTPBearer()
 
 
-def get_jwks_provider(settings: Settings = Depends(get_settings)) -> JWKSProvider:  # noqa: B008
+def get_jwks_provider(settings: Settings = Depends(get_settings)) -> JWKSProvider:
     return build_jwks_provider(settings)
 
 
 def get_current_identity(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),  # noqa: B008
-    settings: Settings = Depends(get_settings),  # noqa: B008
-    jwks_provider: JWKSProvider = Depends(get_jwks_provider),  # noqa: B008
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    settings: Settings = Depends(get_settings),
+    jwks_provider: JWKSProvider = Depends(get_jwks_provider),
 ) -> Identity:
     try:
         claims = decode_token(credentials.credentials, settings, jwks_provider)
@@ -31,9 +31,7 @@ def get_current_identity(
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
-def require_organizer_claim(
-    identity: Identity = Depends(get_current_identity),  # noqa: B008
-) -> Identity:
+def require_organizer_claim(identity: Identity = Depends(get_current_identity)) -> Identity:
     if not identity.has_organizer_claim:
         raise HTTPException(status_code=403, detail="organizer claim required")
     return identity
@@ -88,8 +86,8 @@ def visible_event_ids(db: Session, identity: Identity) -> set[uuid.UUID]:
 
 def require_event_organizer(
     event_id: uuid.UUID,
-    identity: Identity = Depends(get_current_identity),  # noqa: B008
-    db: Session = Depends(get_db_session),  # noqa: B008
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
 ) -> Identity:
     if not event_organizer_exists(db, identity, event_id):
         raise HTTPException(status_code=403, detail="Organizer role required for this event")
@@ -98,8 +96,8 @@ def require_event_organizer(
 
 def require_pod_organizer(
     pod_id: uuid.UUID,
-    identity: Identity = Depends(get_current_identity),  # noqa: B008
-    db: Session = Depends(get_db_session),  # noqa: B008
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
 ) -> Identity:
     pod = db.get(Pod, pod_id)
     if pod is None:
@@ -113,8 +111,8 @@ def require_pod_organizer(
 
 def require_pod_access(
     pod_id: uuid.UUID,
-    identity: Identity = Depends(get_current_identity),  # noqa: B008
-    db: Session = Depends(get_db_session),  # noqa: B008
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
 ) -> Identity:
     pod = db.get(Pod, pod_id)
     if pod is None:
