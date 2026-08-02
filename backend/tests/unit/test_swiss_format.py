@@ -114,3 +114,100 @@ def test_compute_standings_raises_on_unreported_match():
 
     with pytest.raises(ValueError, match="unreported"):
         _compute_standings([e1, e2], [round1])
+
+
+def test_round_two_pairs_within_score_groups_by_prior_results():
+    e1, e2, e3, e4 = _entry(), _entry(), _entry(), _entry()
+    round1 = _round(
+        1,
+        [
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e1.id,
+                entry2_id=e2.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e3.id,
+                entry2_id=e4.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+        ],
+    )
+
+    pairings = SwissFormat().generate_round(entries=[e1, e2, e3, e4], previous_rounds=[round1])
+
+    pair_sets = {frozenset({p.entry1_id, p.entry2_id}) for p in pairings}
+    assert pair_sets == {frozenset({e1.id, e3.id}), frozenset({e2.id, e4.id})}
+    assert all(p.table_number is not None for p in pairings)
+
+
+def test_round_three_avoids_rematches_across_two_prior_rounds():
+    e1, e2, e3, e4 = _entry(), _entry(), _entry(), _entry()
+    round1 = _round(
+        1,
+        [
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e1.id,
+                entry2_id=e2.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e3.id,
+                entry2_id=e4.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+        ],
+    )
+    round2 = _round(
+        2,
+        [
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e1.id,
+                entry2_id=e3.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e2.id,
+                entry2_id=e4.id,
+                result=MatchResult.ENTRY2_WIN,
+            ),
+        ],
+    )
+
+    pairings = SwissFormat().generate_round(
+        entries=[e1, e2, e3, e4], previous_rounds=[round1, round2]
+    )
+
+    pair_sets = {frozenset({p.entry1_id, p.entry2_id}) for p in pairings}
+    already_played = {
+        frozenset({e1.id, e2.id}),
+        frozenset({e3.id, e4.id}),
+        frozenset({e1.id, e3.id}),
+        frozenset({e2.id, e4.id}),
+    }
+    assert pair_sets.isdisjoint(already_played)
+    assert pair_sets == {frozenset({e1.id, e4.id}), frozenset({e2.id, e3.id})}
+
+
+def test_select_bye_entry_skips_lowest_ranked_if_already_used():
+    from app.formats.swiss import _select_bye_entry
+
+    e1, e2 = _entry(), _entry()
+    ranked = [e1, e2]  # e2 is lowest-ranked (last in the list)
+    bye_used = {e2.id}
+
+    chosen = _select_bye_entry(ranked, bye_used)
+
+    assert chosen.id == e1.id
