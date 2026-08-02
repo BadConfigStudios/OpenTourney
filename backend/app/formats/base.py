@@ -10,6 +10,7 @@ from app.models import Entry, Round
 class Pairing:
     entry1_id: uuid.UUID
     entry2_id: uuid.UUID | None  # None means a bye
+    table_number: int | None = None
 
 
 class TournamentFormat(ABC):

@@ -21,3 +21,15 @@ def test_concrete_format_implements_generate_round():
 
     assert len(pairings) == 1
     assert pairings[0].entry2_id is None
+
+
+def test_pairing_table_number_defaults_to_none():
+    pairing = Pairing(entry1_id=uuid.uuid4(), entry2_id=uuid.uuid4())
+
+    assert pairing.table_number is None
+
+
+def test_pairing_table_number_can_be_set():
+    pairing = Pairing(entry1_id=uuid.uuid4(), entry2_id=uuid.uuid4(), table_number=3)
+
+    assert pairing.table_number == 3
