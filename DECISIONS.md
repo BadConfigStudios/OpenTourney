@@ -117,3 +117,33 @@ Best-of-three and self-service player registration are both deferred to
 future MVPs, to keep MVP1's Match model and RBAC-gated entry-creation flow
 simple. Neither blocks running a real event — an Organizer/Scorekeeper can
 still register players manually at check-in.
+
+## 2026-08-02 — `Round.matches` ORM relationship, not an interface signature change
+
+`TournamentFormat.generate_round(entries, previous_rounds)` needs prior
+match results to compute standings, but `Round` had no relationship to
+`Match` (Phase 3 didn't need one). Rather than change the already-merged
+interface signature to carry results explicitly, Phase 4 adds a standard
+SQLAlchemy `relationship()` from `Round` to `Match` (the FK already exists
+on `Match.round_id`). `previous_rounds: Sequence[Round]` stays exactly as
+documented; Swiss reads `round.matches`. No migration needed — additive,
+ORM-only change.
+
+## 2026-08-02 — Table/seat assignment: `table_number` on `Match`/`Pairing`, not a separate entity
+
+FR11 only requires a table/seat number attached to each in-person pairing.
+Adding `table_number: int | None` directly to `Match` (migration `0005`)
+and to the `Pairing` dataclass in `app.formats.base` matches the existing
+one-pairing-per-match shape. A separate `Seat`/`Table` entity would add
+schema complexity (multi-entry tables, table metadata) that nothing in
+v1 scope requires.
+
+## 2026-08-02 — Swiss scoring: 3/1/0 match points, byes count as a win
+
+Standard Play!-style Swiss scoring (win = 3, tie = 1, loss = 0; a bye
+scores as a win) drives standings for round 2+. Round 1 pairs entries in
+the order passed to `generate_round` (sequential adjacent pairing,
+odd-one-out gets the bye) rather than randomizing internally — any
+randomization is the caller's responsibility (e.g. shuffling `entries`
+before calling), keeping the format itself deterministic and easy to
+test.

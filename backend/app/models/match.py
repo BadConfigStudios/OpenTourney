@@ -45,3 +45,4 @@ class Match(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     confirmed_by: Mapped[list] = mapped_column(
         MutableList.as_mutable(JSONB), nullable=False, default=list
     )
+    table_number: Mapped[int | None] = mapped_column(nullable=True)
