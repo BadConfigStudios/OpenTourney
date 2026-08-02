@@ -8,6 +8,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from testcontainers.community.postgres import PostgresContainer
 
+from app.config import Settings
+from tests.support.jwt_helpers import generate_test_keypair, mint_token
+
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
@@ -39,3 +42,38 @@ def db_session(migrated_engine):
     session.close()
     transaction.rollback()
     connection.close()
+
+
+@pytest.fixture()
+def test_keypair():
+    return generate_test_keypair()
+
+
+@pytest.fixture()
+def test_settings(test_keypair):
+    _, jwks_json = test_keypair
+    return Settings(
+        database_url="unused-in-tests",
+        oidc_issuer="https://test-issuer.example.com",
+        oidc_audience="opentourney-test",
+        oidc_jwks_url=None,
+        oidc_jwks_static=jwks_json,
+    )
+
+
+@pytest.fixture()
+def make_token(test_keypair, test_settings):
+    private_key, _ = test_keypair
+
+    def _make(*, player_uuid, source_system="club-checkin", roles=None):
+        return mint_token(
+            private_key,
+            kid="test-key",
+            issuer=test_settings.oidc_issuer,
+            audience=test_settings.oidc_audience,
+            player_uuid=player_uuid,
+            source_system=source_system,
+            roles=roles,
+        )
+
+    return _make
