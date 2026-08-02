@@ -84,3 +84,17 @@ def test_match_allows_null_entry2_for_bye(db_session):
 
     assert match.id is not None
     assert match.entry2_id is None
+
+
+def test_round_matches_relationship_returns_associated_matches(db_session):
+    pod, entry1, entry2 = _make_pod_with_two_entries(db_session)
+    round_ = Round(pod_id=pod.id, number=1)
+    db_session.add(round_)
+    db_session.flush()
+
+    match = Match(round_id=round_.id, entry1_id=entry1.id, entry2_id=entry2.id)
+    db_session.add(match)
+    db_session.commit()
+    db_session.refresh(round_)
+
+    assert [m.id for m in round_.matches] == [match.id]
