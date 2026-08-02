@@ -32,7 +32,7 @@ def migrated_engine(postgres_url):
 def db_session(migrated_engine):
     connection = migrated_engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection)
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
 
     yield session
 
