@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Protocol
 
 import jwt
@@ -30,6 +31,7 @@ class StaticJWKSProvider:
         raise jwt.InvalidTokenError(f"no JWKS key found for kid={kid!r}")
 
 
+@lru_cache
 def build_jwks_provider(settings: Settings) -> JWKSProvider:
     if settings.oidc_jwks_static:
         return StaticJWKSProvider(settings.oidc_jwks_static)

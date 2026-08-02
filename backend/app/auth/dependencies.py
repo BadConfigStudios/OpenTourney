@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.auth.identity import Identity, identity_from_claims
 from app.auth.jwks import JWKSProvider, build_jwks_provider
-from app.auth.oidc import AuthError, decode_token
+from app.auth.oidc import AuthError, AuthServiceUnavailableError, decode_token
 from app.config import Settings, get_settings
 from app.db import get_db_session
+from app.models import Event
 from app.models.pod import Pod
 from app.models.rbac import EventOrganizer, PodRole
 
@@ -27,6 +28,8 @@ def get_current_identity(
     try:
         claims = decode_token(credentials.credentials, settings, jwks_provider)
         return identity_from_claims(claims)
+    except AuthServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except AuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
@@ -89,6 +92,9 @@ def require_event_organizer(
     identity: Identity = Depends(get_current_identity),
     db: Session = Depends(get_db_session),
 ) -> Identity:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="event not found")
     if not event_organizer_exists(db, identity, event_id):
         raise HTTPException(status_code=403, detail="Organizer role required for this event")
     return identity

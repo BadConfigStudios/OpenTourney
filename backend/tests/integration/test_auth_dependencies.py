@@ -1,11 +1,13 @@
 import uuid
 from datetime import date
 
+import jwt
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from app.auth.dependencies import (
     get_current_identity,
+    get_jwks_provider,
     require_event_organizer,
     require_organizer_claim,
     require_pod_access,
@@ -17,6 +19,13 @@ from app.config import get_settings
 from app.db import get_db_session
 from app.models import Event, Pod
 from app.models.rbac import EventOrganizer, PodRole
+
+
+class _FakeUnreachableJWKSProvider:
+    """Simulates a JWKS source (e.g. the IdP) that cannot be reached over the network."""
+
+    def get_signing_key(self, token: str):
+        raise jwt.PyJWKClientConnectionError("simulated JWKS fetch failure")
 
 
 def _build_test_app() -> FastAPI:
@@ -85,6 +94,19 @@ def test_missing_token_is_rejected(db_session, test_settings):
     assert response.status_code == 401
 
 
+def test_unreachable_jwks_source_is_reported_as_service_unavailable(
+    db_session, test_settings, make_token
+):
+    app = _build_test_app()
+    client = _client(app, db_session, test_settings)
+    app.dependency_overrides[get_jwks_provider] = lambda: _FakeUnreachableJWKSProvider()
+    token = make_token(player_uuid=uuid.uuid4())
+
+    response = client.get("/whoami", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 503
+
+
 def test_tampered_token_is_rejected(db_session, test_settings, make_token):
     client = _client(_build_test_app(), db_session, test_settings)
     token = make_token(player_uuid=uuid.uuid4())
@@ -145,6 +167,17 @@ def test_no_event_organizer_row_is_forbidden(db_session, test_settings, make_tok
     )
 
     assert response.status_code == 403
+
+
+def test_nonexistent_event_is_not_found_for_event_organizer(db_session, test_settings, make_token):
+    client = _client(_build_test_app(), db_session, test_settings)
+    token = make_token(player_uuid=uuid.uuid4(), source_system="club-checkin")
+
+    response = client.get(
+        f"/events/{uuid.uuid4()}/organizer-only", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 404
 
 
 def test_event_organizer_row_grants_pod_organizer_access(db_session, test_settings, make_token):

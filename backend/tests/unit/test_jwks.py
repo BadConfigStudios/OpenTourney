@@ -66,3 +66,43 @@ def test_build_jwks_provider_raises_when_nothing_configured():
 
     with pytest.raises(RuntimeError, match="neither OIDC_JWKS_STATIC nor OIDC_JWKS_URL"):
         build_jwks_provider(settings)
+
+
+def test_build_jwks_provider_is_cached_for_the_same_settings():
+    _, jwks_json = generate_test_keypair()
+    settings = Settings(
+        database_url="unused",
+        oidc_issuer="https://issuer.example.com",
+        oidc_audience="aud",
+        oidc_jwks_url=None,
+        oidc_jwks_static=jwks_json,
+    )
+
+    first = build_jwks_provider(settings)
+    second = build_jwks_provider(settings)
+
+    assert first is second
+
+
+def test_build_jwks_provider_gives_distinct_settings_distinct_cache_entries():
+    _, jwks_json_a = generate_test_keypair(kid="k1")
+    _, jwks_json_b = generate_test_keypair(kid="k2")
+    settings_a = Settings(
+        database_url="unused",
+        oidc_issuer="https://issuer.example.com",
+        oidc_audience="aud",
+        oidc_jwks_url=None,
+        oidc_jwks_static=jwks_json_a,
+    )
+    settings_b = Settings(
+        database_url="unused",
+        oidc_issuer="https://issuer.example.com",
+        oidc_audience="aud",
+        oidc_jwks_url=None,
+        oidc_jwks_static=jwks_json_b,
+    )
+
+    provider_a = build_jwks_provider(settings_a)
+    provider_b = build_jwks_provider(settings_b)
+
+    assert provider_a is not provider_b

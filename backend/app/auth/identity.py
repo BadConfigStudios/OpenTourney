@@ -20,7 +20,13 @@ def identity_from_claims(claims: dict) -> Identity:
             "token is missing required identity claims (sub, source_system)"
         ) from exc
 
-    roles = claims.get("roles", [])
+    if not isinstance(source_system, str):
+        raise AuthError("token 'source_system' claim must be a string")
+
+    roles = claims.get("roles") or []
+    if not isinstance(roles, list):
+        raise AuthError("token 'roles' claim must be a list")
+
     return Identity(
         player_uuid=player_uuid,
         source_system=source_system,
