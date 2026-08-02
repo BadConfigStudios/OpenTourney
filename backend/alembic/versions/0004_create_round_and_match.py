@@ -14,6 +14,9 @@ down_revision = "0003"
 branch_labels = None
 depends_on = None
 
+# create_type=False keeps op.create_table() from re-emitting its own CREATE TYPE for this
+# enum; the type is created explicitly below via match_result_enum.create(), and letting
+# create_table() also emit it would collide and raise DuplicateObject.
 match_result_enum = postgresql.ENUM(
     "unreported",
     "entry1_win",

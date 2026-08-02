@@ -57,3 +57,30 @@ def test_match_requires_existing_round(db_session):
 
     with pytest.raises(IntegrityError):
         db_session.commit()
+
+
+def test_match_requires_existing_entry1(db_session):
+    pod, _entry1, entry2 = _make_pod_with_two_entries(db_session)
+    round_ = Round(pod_id=pod.id, number=1)
+    db_session.add(round_)
+    db_session.flush()
+
+    match = Match(round_id=round_.id, entry1_id=uuid.uuid4(), entry2_id=entry2.id)
+    db_session.add(match)
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_match_allows_null_entry2_for_bye(db_session):
+    pod, entry1, _entry2 = _make_pod_with_two_entries(db_session)
+    round_ = Round(pod_id=pod.id, number=1)
+    db_session.add(round_)
+    db_session.flush()
+
+    match = Match(round_id=round_.id, entry1_id=entry1.id, entry2_id=None)
+    db_session.add(match)
+    db_session.commit()
+
+    assert match.id is not None
+    assert match.entry2_id is None

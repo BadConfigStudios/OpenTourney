@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -32,6 +33,8 @@ class Match(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Enum(
             MatchResult,
             name="match_result",
+            # values_callable sends the enum's .value (lowercase) to Postgres instead of
+            # the default .name, which must match the lowercase labels of the DB enum type.
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         nullable=False,
@@ -39,4 +42,6 @@ class Match(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     reported_by: Mapped[str | None] = mapped_column(String, nullable=True)
     witnessed_by: Mapped[str | None] = mapped_column(String, nullable=True)
-    confirmed_by: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    confirmed_by: Mapped[list] = mapped_column(
+        MutableList.as_mutable(JSONB), nullable=False, default=list
+    )

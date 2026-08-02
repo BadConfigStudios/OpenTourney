@@ -47,3 +47,16 @@ def test_entry_rejects_duplicate_player_in_same_pod(db_session):
     )
     with pytest.raises(IntegrityError):
         db_session.commit()
+
+
+def test_entry_requires_existing_pod(db_session):
+    entry = Entry(
+        pod_id=uuid.uuid4(),
+        player_uuid=uuid.uuid4(),
+        source_system="club-checkin",
+        metadata_={},
+    )
+    db_session.add(entry)
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
