@@ -1,4 +1,3 @@
-# backend/tests/integration/test_pods_api.py
 import uuid
 
 from app.models import Entry, Match, Pod, Round
@@ -73,10 +72,17 @@ def test_organizer_can_update_and_delete_pod(api_client, make_token):
 
     patch_response = api_client.patch(
         f"/pods/{pod_id}",
-        json={"format_slug": "swiss", "game_slug": "generic"},
+        json={"format_slug": "swiss", "game_slug": "pokemon-tcg"},
         headers=_auth_headers(token),
     )
     assert patch_response.status_code == 200
+    assert patch_response.json()["game_slug"] == "pokemon-tcg"
+
+    # Re-GET to confirm the update actually persisted, not just that the PATCH
+    # response body claimed it did.
+    confirm_response = api_client.get(f"/pods/{pod_id}", headers=_auth_headers(token))
+    assert confirm_response.status_code == 200
+    assert confirm_response.json()["game_slug"] == "pokemon-tcg"
 
     delete_response = api_client.delete(f"/pods/{pod_id}", headers=_auth_headers(token))
     assert delete_response.status_code == 204
@@ -100,6 +106,54 @@ def test_list_pods_requires_event_visibility(api_client, make_token):
     )
 
     assert response.status_code == 403
+
+
+def test_list_pods_filters_to_requested_event_only(api_client, make_token):
+    token_a = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    token_b = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    event_a_id = _create_event(api_client, token_a)
+    pod_a_id = api_client.post(
+        "/pods",
+        json={"event_id": event_a_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token_a),
+    ).json()["id"]
+
+    event_b_id = _create_event(api_client, token_b)
+    api_client.post(
+        "/pods",
+        json={"event_id": event_b_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token_b),
+    )
+
+    response = api_client.get(
+        "/pods", params={"event_id": event_a_id}, headers=_auth_headers(token_a)
+    )
+
+    assert response.status_code == 200
+    pods = response.json()
+    assert len(pods) == 1
+    assert pods[0]["id"] == pod_a_id
+    assert pods[0]["event_id"] == event_a_id
+
+
+def test_get_pod_by_id_returns_matching_pod(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    event_id = _create_event(api_client, token)
+    created = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token),
+    ).json()
+
+    response = api_client.get(f"/pods/{created['id']}", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == created["id"]
+    assert body["event_id"] == event_id
+    assert body["format_slug"] == "swiss"
+    assert body["game_slug"] == "generic"
 
 
 def test_deleting_pod_cascades_to_rounds_matches_entries_and_roles(

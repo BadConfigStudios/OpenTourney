@@ -11,8 +11,9 @@ from app.auth.dependencies import (
 )
 from app.auth.identity import Identity
 from app.db import get_db_session
-from app.models import Entry, Event, Match, Pod, Round
-from app.models.rbac import EventOrganizer, PodRole
+from app.models import Event, Pod
+from app.models.rbac import EventOrganizer
+from app.routers.pods import delete_pod_children
 from app.schemas.event import EventCreate, EventRead, EventUpdate
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -47,7 +48,7 @@ def list_events(
     ids = visible_event_ids(db, identity)
     if not ids:
         return []
-    return db.query(Event).filter(Event.id.in_(ids)).all()
+    return db.query(Event).filter(Event.id.in_(ids)).order_by(Event.date, Event.id).all()
 
 
 @router.get("/{event_id}", response_model=EventRead)
@@ -91,11 +92,7 @@ def delete_event(
         raise HTTPException(status_code=404, detail="event not found")
 
     for pod in db.query(Pod).filter_by(event_id=event_id).all():
-        for round_ in db.query(Round).filter_by(pod_id=pod.id).all():
-            db.query(Match).filter_by(round_id=round_.id).delete()
-        db.query(Round).filter_by(pod_id=pod.id).delete()
-        db.query(Entry).filter_by(pod_id=pod.id).delete()
-        db.query(PodRole).filter_by(pod_id=pod.id).delete()
+        delete_pod_children(db, pod.id)
         db.delete(pod)
     db.query(EventOrganizer).filter_by(event_id=event_id).delete()
     db.delete(event)

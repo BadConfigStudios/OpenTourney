@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,6 +9,7 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 class Pod(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "pods"
+    __table_args__ = (UniqueConstraint("event_id", name="uq_pod_event"),)
 
     event_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("events.id"), nullable=False

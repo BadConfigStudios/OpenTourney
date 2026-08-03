@@ -1,4 +1,3 @@
-# backend/tests/integration/test_events_api.py
 import uuid
 
 from app.models import Entry, Match, Pod, Round

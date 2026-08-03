@@ -1,7 +1,7 @@
-# backend/app/routers/pods.py
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import (
@@ -42,20 +42,27 @@ def create_pod(
         game_slug=payload.game_slug,
     )
     db.add(pod)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="event already has a pod; v1 supports exactly one pod per event",
+        ) from None
     db.refresh(pod)
     return pod
 
 
 @router.get("", response_model=list[PodRead])
 def list_pods(
-    event_id: uuid.UUID = Query(...),
+    event_id: uuid.UUID,
     identity: Identity = Depends(get_current_identity),
     db: Session = Depends(get_db_session),
 ) -> list[Pod]:
     if event_id not in visible_event_ids(db, identity):
         raise HTTPException(status_code=403, detail="no role scoped to this event")
-    return db.query(Pod).filter_by(event_id=event_id).all()
+    return db.query(Pod).filter_by(event_id=event_id).order_by(Pod.id).all()
 
 
 @router.get("/{pod_id}", response_model=PodRead)
@@ -87,6 +94,14 @@ def update_pod(
     return pod
 
 
+def delete_pod_children(db: Session, pod_id: uuid.UUID) -> None:
+    for round_ in db.query(Round).filter_by(pod_id=pod_id).all():
+        db.query(Match).filter_by(round_id=round_.id).delete()
+    db.query(Round).filter_by(pod_id=pod_id).delete()
+    db.query(Entry).filter_by(pod_id=pod_id).delete()
+    db.query(PodRole).filter_by(pod_id=pod_id).delete()
+
+
 @router.delete("/{pod_id}", status_code=204)
 def delete_pod(
     pod_id: uuid.UUID,
@@ -97,10 +112,6 @@ def delete_pod(
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
 
-    for round_ in db.query(Round).filter_by(pod_id=pod_id).all():
-        db.query(Match).filter_by(round_id=round_.id).delete()
-    db.query(Round).filter_by(pod_id=pod_id).delete()
-    db.query(Entry).filter_by(pod_id=pod_id).delete()
-    db.query(PodRole).filter_by(pod_id=pod_id).delete()
+    delete_pod_children(db, pod_id)
     db.delete(pod)
     db.commit()

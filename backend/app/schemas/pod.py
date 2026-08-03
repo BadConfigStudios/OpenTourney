@@ -1,4 +1,3 @@
-# backend/app/schemas/pod.py
 import uuid
 
 from pydantic import BaseModel, ConfigDict
