@@ -138,6 +138,86 @@ one-pairing-per-match shape. A separate `Seat`/`Table` entity would add
 schema complexity (multi-entry tables, table metadata) that nothing in
 v1 scope requires.
 
+## 2026-08-02 — OIDC token validation: PyJWT + `PyJWKClient`
+
+Phase 5 is the first phase validating externally-issued identity assertions.
+`PyJWT` (with the `crypto` extra) plus its built-in `PyJWKClient` handles
+JWKS fetch/caching and signature verification with a minimal, actively
+maintained dependency. `python-jose` was rejected (maintenance has slowed,
+past CVEs in its crypto backend); `Authlib` was rejected as broader than
+needed — OpenTourney is only ever a Relying Party validating tokens, never
+performing OAuth/OIDC flows itself.
+
+## 2026-08-02 — RBAC schema: two explicit tables, not one nullable-scope table
+
+`event_organizers(event_id, player_uuid, source_system)` and
+`pod_roles(pod_id, player_uuid, source_system, role)` (role: `scorekeeper` |
+`user`) replace a single `role_assignments` table with nullable `event_id`/
+`pod_id` columns. Each table's meaning is unambiguous from its columns
+alone — no row requires knowing which scope column is null to interpret
+what it grants. Organizer is inherently event-wide (manages an event's pods
+and entries), so it never needs pod-level granularity; Scorekeeper/User are
+inherently pod-scoped.
+
+## 2026-08-02 — Organizer bootstrap: trust an `organizer` claim in the OIDC token
+
+`event_organizers` has no row for a not-yet-created event, so something
+else must gate `POST /events`. Rather than add an OpenTourney-owned global
+"platform organizer" table (an operator-managed allowlist with no admin UI
+in v1), `POST /events` requires the caller's identity assertion to carry an
+organizer claim (e.g. `roles: ["organizer"]`) asserted by the host system.
+On success, the creator is auto-inserted into `event_organizers` for the new
+event. This keeps the claim minimal (identity + host-asserted capability)
+and consistent with "OpenTourney owns no accounts" — the host already knows
+who its organizers are; OpenTourney still owns all *per-event/pod* RBAC from
+that point forward.
+
+## 2026-08-02 — Auth tests: ephemeral keypair + monkeypatched JWKS, never a bypassed dependency
+
+Tests generate a real RSA keypair per session, mint tokens signed with it,
+and monkeypatch only the JWKS-fetch step (via `OIDC_JWKS_STATIC` / a
+`get_settings` override) to serve that key's public JWK. `decode_token` and
+`identity_from_claims` run for real in every test. Rejected: overriding the
+`get_current_identity` FastAPI dependency to inject a fake identity directly
+— that would mean the validation logic is never actually exercised by any
+test.
+
+## 2026-08-02 — Staging OIDC verification: static JWKS env-var escape hatch, no mock IdP
+
+No real external OIDC IdP exists yet for the cube cluster. Rather than
+deploy and maintain a mock IdP (e.g. Dex) purely to verify Phase 5, the app
+supports `OIDC_JWKS_STATIC` (a fixed JWK set given directly via env/secret,
+no HTTP fetch) alongside the production path `OIDC_JWKS_URL` (real
+discovery). Staging's Helm values point `OIDC_JWKS_STATIC` at a fixed test
+keypair's public JWK; the same private key mints a token locally
+(`scripts/mint_test_token.py`) for manual `curl` verification against the
+deployed service. When a real host IdP is integrated later, staging simply
+switches to `OIDC_JWKS_URL` — no code change.
+
+## 2026-08-02 — Phase 5 split into 4 sequenced PRs
+
+Phase 5 spans DB/auth plumbing, RBAC tables, three CRUD routers, GameModule
+wiring, OpenAPI publish, and Helm/staging config — too large for the usual
+single-PR/~300-line guardrail. Split as: **PR1** DB session + OIDC/JWT
+validation + RBAC tables (no routes yet); **PR2** Events + Pods CRUD
+routers; **PR3** Entries CRUD + GameModule wiring + pod-role-assignment
+endpoints; **PR4** OpenAPI export/CI drift-check + Helm/staging wiring +
+manual verification. Issue #5 stays open across all four, closed after PR4.
+
+## 2026-08-02 — Issues #16/#17 (PR1 deferred findings) slotted into PR4, ahead of the OpenAPI/Helm tasks
+
+PR1's final whole-branch review deferred two items rather than fixing them
+inline: issue #16 (Minor — auth/RBAC test-coverage and polish gaps) and
+issue #17 (Important — move `Settings`/`JWKSProvider` construction to a
+FastAPI startup `lifespan` so misconfiguration fails at boot instead of on
+first request). Both are now Tasks 13–14 of PR4's plan, running *before*
+the OpenAPI export/Helm/staging-verification tasks (renumbered 15–19),
+since issue #17 changes how `app/main.py` constructs the app (every later
+PR4 task touching `app/main.py` needs to build on top of the `lifespan`
+wrapper, not before it) and issue #16 touches shared test infrastructure
+(`tests/support/`) that's cheaper to land before the staging-verification
+pass than after.
+
 ## 2026-08-02 — Swiss scoring: 3/1/0 match points, byes count as a win
 
 Standard Play!-style Swiss scoring (win = 3, tie = 1, loss = 0; a bye
