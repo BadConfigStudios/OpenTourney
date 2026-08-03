@@ -48,6 +48,7 @@ behind each decision reflected here.
 | FR21 | Operational UI: BO1 scoring, gated by RBAC role | BR1 | 7 |
 | FR22 | Operational UI: final report display | BR1 | 7 |
 | FR23 | Sphinx docs content: data-model reference (autodoc), API usage guide, deployment guide — versioned per release | BR2 | 8 |
+| FR24 | Dynamic Swiss round-target: recompute `ceil(log2(active_entries))` from non-dropped entries before each round's pairing, surface the reason to the organizer when it changes; entry drop tracking (`Entry.dropped_at_round`) | BR1 | TBD (post-MVP1) |
 
 ## Non-Functional Requirements (NFR)
 
@@ -78,7 +79,10 @@ model, API usage, and deployment.
 architectural non-goals): Pokémon TCG (and other) `GameModule`s,
 single/double-elimination and multi-phase `TournamentFormat`s, BO3,
 self-service player registration, online modality (per-game module:
-username discovery, friending instructions, match setup).
+username discovery, friending instructions, match setup), dynamic Swiss
+round-target recalculation from mid-tournament drops (FR24) — Phase 6
+covers organizer-triggered round generation and manual early completion,
+but not automatic target adjustment when entries drop.
 
 **Roadmap** (auxiliary/integration work, see README): SAML/LDAP auth,
 embeddable UI module, presentation mode, public meta/analytics API,
