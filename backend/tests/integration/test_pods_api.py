@@ -181,3 +181,25 @@ def test_pod_organizer_of_one_event_cannot_write_to_another_events_pod(api_clien
 
     delete_response = api_client.delete(f"/pods/{pod_b_id}", headers=_auth_headers(token_a))
     assert delete_response.status_code == 403
+
+
+def test_pod_organizer_of_one_event_cannot_read_another_events_pod(api_client, make_token):
+    token_a = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    token_b = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    event_a_id = _create_event(api_client, token_a)
+    api_client.post(
+        "/pods",
+        json={"event_id": event_a_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token_a),
+    )
+
+    event_b_id = _create_event(api_client, token_b)
+    pod_b_id = api_client.post(
+        "/pods",
+        json={"event_id": event_b_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token_b),
+    ).json()["id"]
+
+    get_response = api_client.get(f"/pods/{pod_b_id}", headers=_auth_headers(token_a))
+    assert get_response.status_code == 403
