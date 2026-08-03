@@ -115,6 +115,15 @@ def require_pod_organizer(
     return identity
 
 
+def pod_access_allowed(db: Session, identity: Identity, pod_id: uuid.UUID) -> bool:
+    pod = db.get(Pod, pod_id)
+    if pod is None:
+        return False
+    return event_organizer_exists(db, identity, pod.event_id) or pod_role_exists(
+        db, identity, pod_id
+    )
+
+
 def require_pod_access(
     pod_id: uuid.UUID,
     identity: Identity = Depends(get_current_identity),
@@ -123,9 +132,6 @@ def require_pod_access(
     pod = db.get(Pod, pod_id)
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
-    if not (
-        event_organizer_exists(db, identity, pod.event_id)
-        or pod_role_exists(db, identity, pod_id)
-    ):
+    if not pod_access_allowed(db, identity, pod_id):
         raise HTTPException(status_code=403, detail="no role scoped to this pod")
     return identity
