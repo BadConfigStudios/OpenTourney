@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_pod_organizer
@@ -9,7 +10,9 @@ from app.db import get_db_session
 from app.models.rbac import PodRole
 from app.schemas.pod_role import PodRoleCreate, PodRoleRead
 
-router = APIRouter(prefix="/pods/{pod_id}/roles", tags=["pod-roles"])
+router = APIRouter(prefix="/pods/{pod_id}/roles", tags=["pod_roles"])
+
+# scorekeeper and user grant identical access today; differentiation lands later (match-results).
 
 
 @router.post("", response_model=PodRoleRead, status_code=201)
@@ -40,7 +43,13 @@ def assign_pod_role(
         role=payload.role,
     )
     db.add(role)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="this identity already has a role on this pod"
+        ) from None
     db.refresh(role)
     return role
 
@@ -51,7 +60,7 @@ def list_pod_roles(
     identity: Identity = Depends(require_pod_organizer),
     db: Session = Depends(get_db_session),
 ) -> list[PodRole]:
-    return db.query(PodRole).filter_by(pod_id=pod_id).all()
+    return db.query(PodRole).filter_by(pod_id=pod_id).order_by(PodRole.id).all()
 
 
 @router.delete("/{role_id}", status_code=204)

@@ -1,16 +1,18 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import (
     event_organizer_exists,
     get_current_identity,
-    pod_role_exists,
+    pod_access_allowed,
     require_pod_access,
 )
 from app.auth.identity import Identity
 from app.db import get_db_session
+from app.games.base import GameModule
 from app.games.registry import get_game_module
 from app.models import Entry, Pod
 from app.schemas.entry import EntryCreate, EntryRead, EntryUpdate
@@ -26,10 +28,21 @@ def _get_entry_or_404(db: Session, entry_id: uuid.UUID) -> Entry:
     return entry
 
 
-def _require_event_organizer(db: Session, identity: Identity, pod: Pod, detail: str) -> None:
+def _require_pod_event_organizer(db: Session, identity: Identity, pod: Pod, detail: str) -> None:
     """Check organizer role for pod's event; raise HTTPException(403) if lacking."""
     if not event_organizer_exists(db, identity, pod.event_id):
         raise HTTPException(status_code=403, detail=detail)
+
+
+def _get_validated_game_module(pod: Pod) -> GameModule:
+    """Look up the game module for a pod's game_slug, or raise a diagnosable 422."""
+    try:
+        return get_game_module(pod.game_slug)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"pod's game_slug {pod.game_slug!r} is not a recognized game module",
+        ) from exc
 
 
 @router.post("", response_model=EntryRead, status_code=201)
@@ -41,13 +54,29 @@ def create_entry(
     pod = db.get(Pod, payload.pod_id)
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
-    _require_event_organizer(db, identity, pod, "Organizer role required for this pod's event")
+    _require_pod_event_organizer(
+        db, identity, pod, "Organizer role required for this pod's event"
+    )
 
+    game_module = _get_validated_game_module(pod)
     try:
-        game_module = get_game_module(pod.game_slug)
         game_module.validate_entry_metadata(payload.metadata)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    existing = (
+        db.query(Entry)
+        .filter_by(
+            pod_id=payload.pod_id,
+            player_uuid=payload.player_uuid,
+            source_system=payload.source_system,
+        )
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=409, detail="an entry for this player already exists on this pod"
+        )
 
     entry = Entry(
         pod_id=payload.pod_id,
@@ -56,7 +85,13 @@ def create_entry(
         metadata_=payload.metadata,
     )
     db.add(entry)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="an entry for this player already exists on this pod"
+        ) from None
     db.refresh(entry)
     return entry
 
@@ -67,7 +102,7 @@ def list_entries(
     identity: Identity = Depends(require_pod_access),
     db: Session = Depends(get_db_session),
 ) -> list[Entry]:
-    return db.query(Entry).filter_by(pod_id=pod_id).all()
+    return db.query(Entry).filter_by(pod_id=pod_id).order_by(Entry.id).all()
 
 
 @router.get("/{entry_id}", response_model=EntryRead)
@@ -77,11 +112,7 @@ def get_entry(
     db: Session = Depends(get_db_session),
 ) -> Entry:
     entry = _get_entry_or_404(db, entry_id)
-    pod = db.get(Pod, entry.pod_id)
-    if not (
-        event_organizer_exists(db, identity, pod.event_id)
-        or pod_role_exists(db, identity, entry.pod_id)
-    ):
+    if not pod_access_allowed(db, identity, entry.pod_id):
         raise HTTPException(status_code=403, detail="no role scoped to this entry's pod")
     return entry
 
@@ -95,10 +126,12 @@ def update_entry(
 ) -> Entry:
     entry = _get_entry_or_404(db, entry_id)
     pod = db.get(Pod, entry.pod_id)
-    _require_event_organizer(db, identity, pod, "Organizer role required for this entry's pod's event")
+    _require_pod_event_organizer(
+        db, identity, pod, "Organizer role required for this entry's pod's event"
+    )
 
+    game_module = _get_validated_game_module(pod)
     try:
-        game_module = get_game_module(pod.game_slug)
         game_module.validate_entry_metadata(payload.metadata)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -117,6 +150,8 @@ def delete_entry(
 ) -> None:
     entry = _get_entry_or_404(db, entry_id)
     pod = db.get(Pod, entry.pod_id)
-    _require_event_organizer(db, identity, pod, "Organizer role required for this entry's pod's event")
+    _require_pod_event_organizer(
+        db, identity, pod, "Organizer role required for this entry's pod's event"
+    )
     db.delete(entry)
     db.commit()
