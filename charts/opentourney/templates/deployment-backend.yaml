@@ -25,6 +25,9 @@ spec:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "ot.fullname" . }}-secrets
           ports:
             - containerPort: {{ .Values.backend.port }}
           readinessProbe:
