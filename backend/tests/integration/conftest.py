@@ -47,7 +47,7 @@ def db_session(migrated_engine):
     connection.close()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def test_keypair():
     return generate_test_keypair()
 

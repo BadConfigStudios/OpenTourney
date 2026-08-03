@@ -1,6 +1,8 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from app.auth.jwks import StaticJWKSProvider, build_jwks_provider
+from app.auth.jwks import RemoteJWKSProvider, StaticJWKSProvider, build_jwks_provider
 from app.config import Settings
 from tests.support.jwt_helpers import generate_test_keypair, mint_token
 
@@ -106,3 +108,23 @@ def test_build_jwks_provider_gives_distinct_settings_distinct_cache_entries():
     provider_b = build_jwks_provider(settings_b)
 
     assert provider_a is not provider_b
+
+
+def test_remote_provider_delegates_to_pyjwk_client():
+    # The only legitimate use of mocking in this codebase: RemoteJWKSProvider is a thin
+    # wrapper around a third-party network client (PyJWKClient), not business logic —
+    # every other test in this project exercises real crypto/DB behavior, never mocks.
+    fake_signing_key = MagicMock()
+    with patch("app.auth.jwks.PyJWKClient") as mock_client_cls:
+        mock_client_cls.return_value.get_signing_key_from_jwt.return_value = fake_signing_key
+
+        provider = RemoteJWKSProvider("https://issuer.example.com/.well-known/jwks.json")
+        result = provider.get_signing_key("some-token")
+
+        mock_client_cls.assert_called_once_with(
+            "https://issuer.example.com/.well-known/jwks.json"
+        )
+        mock_client_cls.return_value.get_signing_key_from_jwt.assert_called_once_with(
+            "some-token"
+        )
+        assert result is fake_signing_key

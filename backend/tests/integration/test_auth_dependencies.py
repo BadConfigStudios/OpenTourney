@@ -1,7 +1,6 @@
 import uuid
 from datetime import date
 
-import jwt
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
@@ -19,13 +18,7 @@ from app.config import get_settings
 from app.db import get_db_session
 from app.models import Event, Pod
 from app.models.rbac import EventOrganizer, PodRole
-
-
-class _FakeUnreachableJWKSProvider:
-    """Simulates a JWKS source (e.g. the IdP) that cannot be reached over the network."""
-
-    def get_signing_key(self, token: str):
-        raise jwt.PyJWKClientConnectionError("simulated JWKS fetch failure")
+from tests.support.fake_jwks import FakeUnreachableJWKSProvider
 
 
 def _build_test_app() -> FastAPI:
@@ -99,7 +92,7 @@ def test_unreachable_jwks_source_is_reported_as_service_unavailable(
 ):
     app = _build_test_app()
     client = _client(app, db_session, test_settings)
-    app.dependency_overrides[get_jwks_provider] = lambda: _FakeUnreachableJWKSProvider()
+    app.dependency_overrides[get_jwks_provider] = lambda: FakeUnreachableJWKSProvider()
     token = make_token(player_uuid=uuid.uuid4())
 
     response = client.get("/whoami", headers={"Authorization": f"Bearer {token}"})

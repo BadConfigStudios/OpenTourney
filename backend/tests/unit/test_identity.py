@@ -68,3 +68,10 @@ def test_identity_from_claims_raises_when_source_system_is_not_a_string():
         identity_from_claims(
             {"sub": str(uuid.uuid4()), "source_system": 12345, "roles": []}
         )
+
+
+def test_identity_from_claims_raises_for_non_uuid_sub():
+    with pytest.raises(AuthError):
+        identity_from_claims(
+            {"sub": "not-a-uuid", "source_system": "club-checkin", "roles": []}
+        )
