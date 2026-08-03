@@ -3645,4 +3645,4 @@ Pass the printed JSON as `--set-string secrets.oidcJwksStatic='...'` on the stag
 
 Fix any findings with follow-up commits on this branch before merging.
 
-**End of PR4 and Phase 5.** Once PR4 is approved, manually verified, and merged (never merge without explicit in-the-moment approval), close GitHub issues #5, #16 (Task 13), and #17 (Task 14), delete the branch, and output the next-phase prompt for Phase 6 (Match & tournament reporting) per the standard phase-completion trigger.
+**End of PR4 and Phase 5.** Once PR4 is approved, manually verified, and merged (never merge without explicit in-the-moment approval), close GitHub issues #5, #16 (Task 13), #17 (Task 14), and #20 (Task 13.5), delete the branch, and output the next-phase prompt for Phase 6 (Match & tournament reporting) per the standard phase-completion trigger.
