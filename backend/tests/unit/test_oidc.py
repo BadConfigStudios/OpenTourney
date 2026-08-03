@@ -6,6 +6,7 @@ import pytest
 from app.auth.jwks import StaticJWKSProvider
 from app.auth.oidc import AuthError, AuthServiceUnavailableError, decode_token
 from app.config import Settings
+from tests.support.fake_jwks import FakeUnreachableJWKSProvider
 from tests.support.jwt_helpers import generate_test_keypair, mint_token
 
 
@@ -88,15 +89,8 @@ def test_decode_token_rejects_token_missing_a_required_claim(missing_claim):
         decode_token(token, settings, StaticJWKSProvider(jwks_json))
 
 
-class _FakeUnreachableJWKSProvider:
-    """Simulates a JWKS source that cannot be reached over the network."""
-
-    def get_signing_key(self, token: str):
-        raise jwt.PyJWKClientConnectionError("simulated JWKS fetch failure")
-
-
 def test_decode_token_reraises_jwks_connection_failure_as_service_unavailable():
     settings = _settings(jwks_json='{"keys": []}')
 
     with pytest.raises(AuthServiceUnavailableError):
-        decode_token("irrelevant-token", settings, _FakeUnreachableJWKSProvider())
+        decode_token("irrelevant-token", settings, FakeUnreachableJWKSProvider())

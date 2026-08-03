@@ -47,6 +47,17 @@ alone:
   A GitHub token with `write:packages` scope (or `read:packages` for a
   pull-only credential) works. Skip this if the secret already exists in
   the namespace.
+- **Required `secrets.*` Helm values.** `values.staging.yaml` has no
+  `secrets:` block, so `--set` flags for these four values are required on
+  every `helm upgrade` (see step 3 below) — the backend's startup lifespan
+  fails fast (`KeyError`/`RuntimeError`, Phase 5 Task 14) without them, and
+  `secrets.databaseUrl` is enforced with Helm's `required` so the chart
+  itself now refuses to render/deploy without it:
+  - `secrets.databaseUrl` — Postgres connection string
+  - `secrets.oidcIssuer` — OIDC issuer URL
+  - `secrets.oidcAudience` — OIDC audience
+  - `secrets.oidcJwksUrl` **or** `secrets.oidcJwksStatic` — one of the two,
+    for JWKS key resolution
 
 ### Namespace & values
 
@@ -82,8 +93,20 @@ alone:
      --namespace opentourney-staging --create-namespace \
      -f charts/opentourney/values.staging.yaml \
      --set backend.image.tag=<tag> \
-     --set frontend.image.tag=<tag>
+     --set frontend.image.tag=<tag> \
+     --set-string secrets.databaseUrl=<database-url> \
+     --set-string secrets.oidcIssuer=<oidc-issuer> \
+     --set-string secrets.oidcAudience=<oidc-audience> \
+     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json>
    ```
+
+   `secrets.databaseUrl`, `secrets.oidcIssuer`, and `secrets.oidcAudience`
+   are required (see Prerequisites above) — the chart's `required` guard on
+   `secrets.databaseUrl` makes an unset/typo'd value fail the `helm upgrade`
+   itself rather than silently deploying a broken release. Use
+   `--set-string secrets.oidcJwksUrl=<oidc-jwks-url>` instead of
+   `secrets.oidcJwksStatic` if the issuer's JWKS should be fetched live
+   rather than pinned.
 
    For a quick image-only iteration once the release already exists, use
    `kubectl set image` instead of a full `helm upgrade`:

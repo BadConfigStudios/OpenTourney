@@ -2,7 +2,8 @@ import uuid
 from datetime import date
 
 import pytest
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
+from sqlalchemy.exc import DataError, IntegrityError
 
 from app.models import Event, Pod
 from app.models.rbac import EventOrganizer, PodRole, PodRoleName
@@ -102,3 +103,30 @@ def test_pod_role_rejects_duplicate_identity_per_pod(db_session):
     )
     with pytest.raises(IntegrityError):
         db_session.commit()
+
+
+def test_pod_role_requires_existing_pod(db_session):
+    db_session.add(
+        PodRole(
+            pod_id=uuid.uuid4(),
+            player_uuid=uuid.uuid4(),
+            source_system="club-checkin",
+            role=PodRoleName.USER,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_pod_role_rejects_invalid_role_value(db_session):
+    event = _make_event(db_session)
+    pod = _make_pod(db_session, event)
+
+    with pytest.raises(DataError):
+        db_session.execute(
+            text(
+                "INSERT INTO pod_roles (id, pod_id, player_uuid, source_system, role) "
+                "VALUES (gen_random_uuid(), :pod_id, gen_random_uuid(), 'club-checkin', 'not-a-real-role')"
+            ),
+            {"pod_id": pod.id},
+        )

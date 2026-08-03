@@ -72,17 +72,17 @@ def test_organizer_can_update_and_delete_pod(api_client, make_token):
 
     patch_response = api_client.patch(
         f"/pods/{pod_id}",
-        json={"format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        json={"format_slug": "swiss", "game_slug": "generic"},
         headers=_auth_headers(token),
     )
     assert patch_response.status_code == 200
-    assert patch_response.json()["game_slug"] == "pokemon-tcg"
+    assert patch_response.json()["game_slug"] == "generic"
 
     # Re-GET to confirm the update actually persisted, not just that the PATCH
     # response body claimed it did.
     confirm_response = api_client.get(f"/pods/{pod_id}", headers=_auth_headers(token))
     assert confirm_response.status_code == 200
-    assert confirm_response.json()["game_slug"] == "pokemon-tcg"
+    assert confirm_response.json()["game_slug"] == "generic"
 
     delete_response = api_client.delete(f"/pods/{pod_id}", headers=_auth_headers(token))
     assert delete_response.status_code == 204
@@ -257,3 +257,34 @@ def test_pod_organizer_of_one_event_cannot_read_another_events_pod(api_client, m
 
     get_response = api_client.get(f"/pods/{pod_b_id}", headers=_auth_headers(token_a))
     assert get_response.status_code == 403
+
+
+def test_create_pod_with_unknown_game_slug_is_rejected(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    event_id = _create_event(api_client, token)
+
+    response = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_pod_with_unknown_game_slug_is_rejected(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    event_id = _create_event(api_client, token)
+    pod_id = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    response = api_client.patch(
+        f"/pods/{pod_id}",
+        json={"format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422

@@ -25,3 +25,10 @@ percona:
   pgVersion: "16"
   storageSize: 5Gi
   backupStorageSize: 5Gi
+
+secrets:
+  databaseUrl: ""
+  oidcIssuer: ""
+  oidcAudience: ""
+  oidcJwksUrl: ""
+  oidcJwksStatic: ""
