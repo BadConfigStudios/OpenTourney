@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from importlib.metadata import version as _pkg_version
 
 from fastapi import FastAPI
 
@@ -15,7 +16,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="OpenTourney", lifespan=lifespan)
+app = FastAPI(
+    title="OpenTourney",
+    version=_pkg_version("opentourney-backend"),
+    lifespan=lifespan,
+)
 app.include_router(events.router)
 app.include_router(pods.router)
 app.include_router(entries.router)
