@@ -26,12 +26,15 @@ separate blocking issue.
   is real, owner-confirmed future scope, deliberately deferred to keep
   Phase 6 sized to a single PR. Tracked as FR24 in `REQUIREMENTS.md` and
   GitHub issue (see Follow-ups).
-- **Real tiebreaking (e.g. opponent match win %).** Standings ties are
-  broken by UUID string, identical to the existing pairing tiebreak in
-  `SwissFormat._rank_entries`. Owner-accepted: "already randomly generated,
-  so it's as good as anything as a tiebreaker" — not investing in OMW% or
-  similar for v1. Same precedent as issue #12 (pairing has a known
-  rematch-avoidance gap, filed as tech debt rather than fixed inline).
+- **Real tiebreaking (OMW%/OOMW%).** Standings ties are broken by UUID
+  string, identical to the existing pairing tiebreak in
+  `SwissFormat._rank_entries`. Owner-accepted for now: "already randomly
+  generated, so it's as good as anything as a tiebreaker." Same precedent
+  as issue #12 (pairing has a known rematch-avoidance gap, filed as tech
+  debt rather than fixed inline). Real tiebreakers (opponent match win %
+  and opponents' opponents' match win %) are scheduled as their own phase
+  before release — FR25, Phase 8, issue #27 — not dropped, just sequenced
+  after this phase.
 - **`confirmed_by`.** The `Match.confirmed_by` JSONB column exists but stays
   unused — no confirm-workflow endpoint this phase. Issue #6's AC doesn't
   call for one. Its presence in the schema already anticipates the

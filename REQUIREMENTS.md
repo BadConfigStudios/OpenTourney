@@ -49,6 +49,7 @@ behind each decision reflected here.
 | FR22 | Operational UI: final report display | BR1 | 7 |
 | FR23 | Sphinx docs content: data-model reference (autodoc), API usage guide, deployment guide — versioned per release | BR2 | 8 |
 | FR24 | Dynamic Swiss round-target: recompute `ceil(log2(active_entries))` from non-dropped entries before each round's pairing, surface the reason to the organizer when it changes; entry drop tracking (`Entry.dropped_at_round`) | BR1 | TBD (post-MVP1) |
+| FR25 | Real Swiss standings tiebreakers: opponent match win % (OMW%) and opponents' opponents' match win % (OOMW%), replacing the UUID-string tiebreak in `SwissFormat` (pairing and final report) | BR1 | 8 |
 
 ## Non-Functional Requirements (NFR)
 
@@ -64,14 +65,15 @@ behind each decision reflected here.
 
 ### MVP1 — Core In-Person Swiss Engine (target `v0.1.0`)
 
-Serves BR1–BR4 / FR1–FR23. Phases 1–8.
+Serves BR1–BR4 / FR1–FR23, FR25. Phases 1–9.
 
 **Acceptance**: An Organizer can authenticate (OIDC), create an in-person
 Event with one Pod (Swiss format, generic game module), add Entries, and
 run the event through the operational UI — Round 1 pairings with seating,
 Scorekeeper/Organizer-entered BO1 results with provenance, subsequent
 rounds generated from standings, through to a final standings/placement
-report — entirely via the published, versioned API, deployed and verified
+report ranked with real tiebreakers (OMW%/OOMW%) — entirely via the
+published, versioned API, deployed and verified
 on the Kubernetes staging environment, with Sphinx docs covering the data
 model, API usage, and deployment.
 
@@ -99,4 +101,5 @@ federation/cross-instance analysis.
 | 5 | Operational API + RBAC + OIDC + published OpenAPI spec | MVP1 |
 | 6 | Match & tournament reporting (BO1 + provenance + final report) | MVP1 |
 | 7 | Operational UI (setup, pairings, scoring, final report) | MVP1 |
-| 8 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 |
+| 8 | Swiss real tiebreakers (OMW%/OOMW%, replacing the UUID tiebreak in pairing + final report) | MVP1 |
+| 9 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 |
