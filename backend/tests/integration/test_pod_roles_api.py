@@ -35,7 +35,7 @@ def test_organizer_assigns_scorekeeper_role(api_client, make_token):
     assert response.json()["role"] == "scorekeeper"
 
 
-def test_non_organizer_cannot_assign_roles(api_client, make_token):
+def test_organizer_of_other_event_cannot_assign_roles(api_client, make_token):
     owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, owner_token)
 
@@ -102,7 +102,7 @@ def test_organizer_can_list_and_revoke_role(api_client, make_token):
     assert list_after_response.json() == []
 
 
-def test_non_organizer_cannot_list_roles(api_client, make_token):
+def test_organizer_of_other_event_cannot_list_roles(api_client, make_token):
     owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, owner_token)
     api_client.post(
@@ -121,7 +121,7 @@ def test_non_organizer_cannot_list_roles(api_client, make_token):
     assert response.status_code == 403
 
 
-def test_non_organizer_cannot_revoke_role(api_client, make_token):
+def test_organizer_of_other_event_cannot_revoke_role(api_client, make_token):
     owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, owner_token)
     role_id = api_client.post(
