@@ -3109,6 +3109,101 @@ git commit -m "feat: fail fast on misconfiguration at startup instead of first r
 
 ---
 
+### Task 13.5: Fix #20 — validate `Pod.game_slug` against the registry at create/update time
+
+Inserted mid-PR4 per owner sign-off (issue #20): validate on both `POST /pods` and `PATCH /pods` whenever `game_slug` is set/changed, returning 422 for an unrecognized slug instead of deferring the failure to first-entry-creation (Task 11's `_get_validated_game_module`). Retroactive re-validation of existing pods on registry changes is explicitly out of scope — filed separately as issue #22.
+
+**Files:**
+
+- Modify: `backend/app/routers/pods.py`
+- Modify: `backend/tests/integration/test_pods_api.py` (existing PATCH test used `"pokemon-tcg"`, an intentionally-unregistered slug per `test_games_registry.py` — switch it to `"generic"` since PATCH now validates)
+
+**Interfaces:**
+
+- Consumes: `app.games.registry.get_game_module` (Task 10), same pattern as `entries.py`'s `_get_validated_game_module` — raises `ValueError` for an unrecognized slug, mapped to `HTTPException(422)`.
+- No schema or model changes; `game_slug` stays a plain string column, validated only at the router layer (matches `entries.py`'s existing approach, not a DB constraint).
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# backend/tests/integration/test_pods_api.py (append)
+def test_create_pod_with_unknown_game_slug_is_rejected(api_client, make_token):
+    token = make_token(roles=[])
+    event_id = str(uuid.uuid4())
+    response = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        headers={"Authorization": f"Bearer {token(roles=[{'event_id': event_id, 'role': 'organizer'}])}"},
+    )
+    assert response.status_code == 422
+
+
+def test_update_pod_with_unknown_game_slug_is_rejected(api_client, make_token):
+    token = make_token(roles=[])
+    event_id = str(uuid.uuid4())
+    role_token = token(roles=[{"event_id": event_id, "role": "organizer"}])
+    create_response = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers={"Authorization": f"Bearer {role_token}"},
+    )
+    pod_id = create_response.json()["id"]
+
+    response = api_client.patch(
+        f"/pods/{pod_id}",
+        json={"format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        headers={"Authorization": f"Bearer {role_token}"},
+    )
+    assert response.status_code == 422
+```
+
+Adapt the token/fixture calls to match this file's existing helper signatures (see `test_organizer_creates_pod_for_own_event` and `test_organizer_can_update_and_delete_pod` above for the exact `make_token`/header pattern already in use).
+
+Also update the existing `test_organizer_can_update_and_delete_pod` (and any other test asserting on a literal `"pokemon-tcg"` PATCH payload) to use `"generic"` instead, since that slug is no longer accepted.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend && pytest tests/integration/test_pods_api.py -v`
+Expected: FAIL — both new tests get 201/200 instead of 422 (no validation yet); the modified `test_organizer_can_update_and_delete_pod` still passes since `"pokemon-tcg"` isn't rejected yet.
+
+- [ ] **Step 3: Add registry validation to `create_pod` and `update_pod`**
+
+```python
+# backend/app/routers/pods.py
+from app.games.registry import get_game_module
+
+def _validate_game_slug(game_slug: str) -> None:
+    try:
+        get_game_module(game_slug)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"game_slug {game_slug!r} is not a recognized game module",
+        ) from exc
+```
+
+Call `_validate_game_slug(payload.game_slug)` at the top of `create_pod` (after the organizer check) and `update_pod` (after the 404 check, before mutating `pod.game_slug`).
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd backend && pytest tests/integration/test_pods_api.py -v`
+Expected: PASS (all tests, including the two new ones and the modified update test)
+
+- [ ] **Step 5: Run the full backend test suite + lint**
+
+Run: `cd backend && pytest -v && ruff check app tests`
+Expected: PASS, no lint errors
+
+- [ ] **Step 6: Commit**
+
+```bash
+cd backend
+git add app/routers/pods.py tests/integration/test_pods_api.py
+git commit -m "fix: validate Pod.game_slug against game module registry at create/update time (closes #20)"
+```
+
+---
+
 ### Task 15: Versioned OpenAPI export + drift test
 
 **Files:**
