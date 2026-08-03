@@ -218,6 +218,24 @@ wrapper, not before it) and issue #16 touches shared test infrastructure
 (`tests/support/`) that's cheaper to land before the staging-verification
 pass than after.
 
+## 2026-08-02 — `game_slug` validated at Entry creation, not Pod creation
+
+`Pod.game_slug`/`format_slug` are unvalidated free text at write time —
+`POST /pods`/`PATCH /pods/{id}` accept any string, deliberately not
+importing `app.games.registry` (a later PR3 module). The only place a
+`game_slug` is actually dereferenced is `POST/PATCH /entries`, via
+`app.games.registry.get_game_module`, which raises `ValueError` for an
+unknown slug. PR2's final review caught that the plan's own Task 11 code
+called `get_game_module(pod.game_slug)` *outside* its `try/except
+ValueError` block — an unrecognized slug would 500, not 422. Fixed in the
+plan (both `create_entry` and `update_entry` now wrap the lookup itself,
+not just `validate_entry_metadata`), plus a regression test
+(`test_entry_creation_rejects_unknown_game_slug_with_422_not_500`).
+Deliberately not validating at Pod-creation time instead: that would pull
+Task 10's registry into PR2's scope, and Entry creation is where FR12
+("`GameModule` wired into Entry creation/validation") already puts the
+authoritative check.
+
 ## 2026-08-02 — Swiss scoring: 3/1/0 match points, byes count as a win
 
 Standard Play!-style Swiss scoring (win = 3, tie = 1, loss = 0; a bye
