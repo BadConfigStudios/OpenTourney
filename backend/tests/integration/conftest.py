@@ -4,11 +4,14 @@ import sys
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from testcontainers.community.postgres import PostgresContainer
 
-from app.config import Settings
+from app.config import Settings, get_settings
+from app.db import get_db_session
+from app.main import app as fastapi_app
 from tests.support.jwt_helpers import generate_test_keypair, mint_token
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -77,3 +80,17 @@ def make_token(test_keypair, test_settings):
         )
 
     return _make
+
+
+@pytest.fixture()
+def api_client(db_session, test_settings):
+    def override_get_db_session():
+        yield db_session
+
+    fastapi_app.dependency_overrides[get_db_session] = override_get_db_session
+    fastapi_app.dependency_overrides[get_settings] = lambda: test_settings
+
+    with TestClient(fastapi_app) as client:
+        yield client
+
+    fastapi_app.dependency_overrides.clear()

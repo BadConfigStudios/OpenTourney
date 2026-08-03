@@ -2170,6 +2170,35 @@ def test_non_organizer_cannot_create_entry(api_client, make_token):
     assert response.status_code == 403
 
 
+def test_entry_creation_rejects_unknown_game_slug_with_422_not_500(api_client, make_token):
+    # Pods accept any game_slug string at creation time (Task 8 doesn't validate against
+    # the registry — that would couple Pods to Task 10, a later PR). The registry lookup
+    # only happens here, at Entry creation, so an unrecognized slug must become a clean
+    # 422, not an unhandled ValueError -> 500.
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    event_id = api_client.post(
+        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+    ).json()["id"]
+    pod_id = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "unknown-game"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422
+
+
 def test_pod_role_can_read_entries_without_organizer_row(api_client, make_token, db_session):
     from app.models.rbac import PodRole
 
@@ -2305,8 +2334,8 @@ def create_entry(
             status_code=403, detail="Organizer role required for this pod's event"
         )
 
-    game_module = get_game_module(pod.game_slug)
     try:
+        game_module = get_game_module(pod.game_slug)
         game_module.validate_entry_metadata(payload.metadata)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -2366,8 +2395,8 @@ def update_entry(
             status_code=403, detail="Organizer role required for this entry's pod's event"
         )
 
-    game_module = get_game_module(pod.game_slug)
     try:
+        game_module = get_game_module(pod.game_slug)
         game_module.validate_entry_metadata(payload.metadata)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -2418,7 +2447,7 @@ def healthz() -> dict[str, str]:
 - [ ] **Step 6: Run test to verify it passes**
 
 Run: `cd backend && pytest tests/integration/test_entries_api.py -v`
-Expected: PASS (4 tests)
+Expected: PASS (5 tests)
 
 - [ ] **Step 7: Commit**
 
