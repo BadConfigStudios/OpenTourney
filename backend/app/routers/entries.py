@@ -18,6 +18,20 @@ from app.schemas.entry import EntryCreate, EntryRead, EntryUpdate
 router = APIRouter(prefix="/entries", tags=["entries"])
 
 
+def _get_entry_or_404(db: Session, entry_id: uuid.UUID) -> Entry:
+    """Lookup entry by ID; raise HTTPException(404) if not found."""
+    entry = db.get(Entry, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="entry not found")
+    return entry
+
+
+def _require_event_organizer(db: Session, identity: Identity, pod: Pod, detail: str) -> None:
+    """Check organizer role for pod's event; raise HTTPException(403) if lacking."""
+    if not event_organizer_exists(db, identity, pod.event_id):
+        raise HTTPException(status_code=403, detail=detail)
+
+
 @router.post("", response_model=EntryRead, status_code=201)
 def create_entry(
     payload: EntryCreate,
@@ -27,10 +41,7 @@ def create_entry(
     pod = db.get(Pod, payload.pod_id)
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
-    if not event_organizer_exists(db, identity, pod.event_id):
-        raise HTTPException(
-            status_code=403, detail="Organizer role required for this pod's event"
-        )
+    _require_event_organizer(db, identity, pod, "Organizer role required for this pod's event")
 
     try:
         game_module = get_game_module(pod.game_slug)
@@ -65,9 +76,7 @@ def get_entry(
     identity: Identity = Depends(get_current_identity),
     db: Session = Depends(get_db_session),
 ) -> Entry:
-    entry = db.get(Entry, entry_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail="entry not found")
+    entry = _get_entry_or_404(db, entry_id)
     pod = db.get(Pod, entry.pod_id)
     if not (
         event_organizer_exists(db, identity, pod.event_id)
@@ -84,14 +93,9 @@ def update_entry(
     identity: Identity = Depends(get_current_identity),
     db: Session = Depends(get_db_session),
 ) -> Entry:
-    entry = db.get(Entry, entry_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail="entry not found")
+    entry = _get_entry_or_404(db, entry_id)
     pod = db.get(Pod, entry.pod_id)
-    if not event_organizer_exists(db, identity, pod.event_id):
-        raise HTTPException(
-            status_code=403, detail="Organizer role required for this entry's pod's event"
-        )
+    _require_event_organizer(db, identity, pod, "Organizer role required for this entry's pod's event")
 
     try:
         game_module = get_game_module(pod.game_slug)
@@ -111,13 +115,8 @@ def delete_entry(
     identity: Identity = Depends(get_current_identity),
     db: Session = Depends(get_db_session),
 ) -> None:
-    entry = db.get(Entry, entry_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail="entry not found")
+    entry = _get_entry_or_404(db, entry_id)
     pod = db.get(Pod, entry.pod_id)
-    if not event_organizer_exists(db, identity, pod.event_id):
-        raise HTTPException(
-            status_code=403, detail="Organizer role required for this entry's pod's event"
-        )
+    _require_event_organizer(db, identity, pod, "Organizer role required for this entry's pod's event")
     db.delete(entry)
     db.commit()
