@@ -1,5 +1,6 @@
 import uuid
 
+from app.models import Pod
 from app.models.rbac import PodRole
 
 
@@ -84,8 +85,8 @@ def test_organizer_of_other_event_cannot_create_entry(api_client, make_token):
     assert response.status_code == 403
 
 
-def test_entry_creation_rejects_unknown_game_slug_with_422_not_500(api_client, make_token):
-    # Pods now validate game_slug at creation time (Task 13.5), so an unrecognized slug
+def test_pod_creation_rejects_unknown_game_slug_with_422_not_500(api_client, make_token):
+    # Pods validate game_slug at creation time (Task 13.5), so an unrecognized slug
     # is rejected at pod creation. This test ensures the registry lookup is validated
     # cleanly as a 422, not an unhandled ValueError -> 500.
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
@@ -97,6 +98,37 @@ def test_entry_creation_rejects_unknown_game_slug_with_422_not_500(api_client, m
     response = api_client.post(
         "/pods",
         json={"event_id": event_id, "format_slug": "swiss", "game_slug": "unknown-game"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422
+
+
+def test_entry_creation_rejects_pod_with_unregistered_game_slug_with_422_not_500(
+    api_client, make_token, db_session
+):
+    # A pod's game_slug is validated against the registry at create/update time
+    # (Task 13.5), but a slug that was valid when the pod was created can later
+    # become unregistered (issue #22). entries.py's own _get_validated_game_module
+    # is the safety net for that case, so bypass the router-level pod validation by
+    # inserting the Pod row directly with an intentionally-unregistered game_slug.
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    event_id = api_client.post(
+        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+    ).json()["id"]
+
+    pod = Pod(event_id=uuid.UUID(event_id), format_slug="swiss", game_slug="pokemon-tcg")
+    db_session.add(pod)
+    db_session.commit()
+
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": str(pod.id),
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
         headers=_auth_headers(token),
     )
 
