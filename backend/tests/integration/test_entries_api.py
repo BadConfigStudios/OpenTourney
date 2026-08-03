@@ -1,0 +1,146 @@
+import uuid
+
+
+def _auth_headers(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _create_pod(api_client, token) -> str:
+    event_id = api_client.post(
+        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+    ).json()["id"]
+    return api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+
+def test_organizer_creates_entry(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    player_uuid = str(uuid.uuid4())
+
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": player_uuid,
+            "source_system": "club-checkin",
+            "metadata": {"display_name": "Ash"},
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["metadata"] == {"display_name": "Ash"}
+
+
+def test_non_organizer_cannot_create_entry(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, owner_token)
+
+    stranger_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
+        headers=_auth_headers(stranger_token),
+    )
+
+    assert response.status_code == 403
+
+
+def test_entry_creation_rejects_unknown_game_slug_with_422_not_500(api_client, make_token):
+    # Pods accept any game_slug string at creation time (Task 8 doesn't validate against
+    # the registry — that would couple Pods to Task 10, a later PR). The registry lookup
+    # only happens here, at Entry creation, so an unrecognized slug must become a clean
+    # 422, not an unhandled ValueError -> 500.
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    event_id = api_client.post(
+        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+    ).json()["id"]
+    pod_id = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "unknown-game"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422
+
+
+def test_pod_role_can_read_entries_without_organizer_row(api_client, make_token, db_session):
+    from app.models.rbac import PodRole
+
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, owner_token)
+    api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
+        headers=_auth_headers(owner_token),
+    )
+
+    reader_uuid = uuid.uuid4()
+    db_session.add(
+        PodRole(
+            pod_id=uuid.UUID(pod_id),
+            player_uuid=reader_uuid,
+            source_system="club-checkin",
+            role="user",
+        )
+    )
+    db_session.commit()
+    reader_token = make_token(player_uuid=reader_uuid, source_system="club-checkin")
+
+    response = api_client.get(
+        "/entries", params={"pod_id": pod_id}, headers=_auth_headers(reader_token)
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_organizer_can_update_and_delete_entry(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_id = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    patch_response = api_client.patch(
+        f"/entries/{entry_id}",
+        json={"metadata": {"display_name": "Misty"}},
+        headers=_auth_headers(token),
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["metadata"] == {"display_name": "Misty"}
+
+    delete_response = api_client.delete(f"/entries/{entry_id}", headers=_auth_headers(token))
+    assert delete_response.status_code == 204
