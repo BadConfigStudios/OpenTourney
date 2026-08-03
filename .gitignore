@@ -26,6 +26,9 @@ docs/_build/
 # --- Worktrees ---
 .worktrees/
 
+# --- Superpowers SDD workspaces ---
+.superpowers/
+
 # --- Editors / OS ---
 .DS_Store
 *.swp
