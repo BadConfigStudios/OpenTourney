@@ -13,11 +13,23 @@ from app.auth.dependencies import (
 )
 from app.auth.identity import Identity
 from app.db import get_db_session
+from app.games.registry import get_game_module
 from app.models import Entry, Match, Pod, Round
 from app.models.rbac import PodRole
 from app.schemas.pod import PodCreate, PodRead, PodUpdate
 
 router = APIRouter(prefix="/pods", tags=["pods"])
+
+
+def _validate_game_slug(game_slug: str) -> None:
+    """Validate that game_slug is a recognized game module, or raise HTTPException(422)."""
+    try:
+        get_game_module(game_slug)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"game_slug {game_slug!r} is not a recognized game module",
+        ) from exc
 
 
 @router.post("", response_model=PodRead, status_code=201)
@@ -28,6 +40,8 @@ def create_pod(
 ) -> Pod:
     if not event_organizer_exists(db, identity, payload.event_id):
         raise HTTPException(status_code=403, detail="Organizer role required for this event")
+
+    _validate_game_slug(payload.game_slug)
 
     existing = db.query(Pod).filter_by(event_id=payload.event_id).first()
     if existing is not None:
@@ -87,6 +101,7 @@ def update_pod(
     pod = db.get(Pod, pod_id)
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
+    _validate_game_slug(payload.game_slug)
     pod.format_slug = payload.format_slug
     pod.game_slug = payload.game_slug
     db.commit()

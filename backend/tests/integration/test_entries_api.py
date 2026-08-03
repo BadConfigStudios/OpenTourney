@@ -85,28 +85,18 @@ def test_organizer_of_other_event_cannot_create_entry(api_client, make_token):
 
 
 def test_entry_creation_rejects_unknown_game_slug_with_422_not_500(api_client, make_token):
-    # Pods accept any game_slug string at creation time (Task 8 doesn't validate against
-    # the registry — that would couple Pods to Task 10, a later PR). The registry lookup
-    # only happens here, at Entry creation, so an unrecognized slug must become a clean
-    # 422, not an unhandled ValueError -> 500.
+    # Pods now validate game_slug at creation time (Task 13.5), so an unrecognized slug
+    # is rejected at pod creation. This test ensures the registry lookup is validated
+    # cleanly as a 422, not an unhandled ValueError -> 500.
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     event_id = api_client.post(
         "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
     ).json()["id"]
-    pod_id = api_client.post(
+
+    # Pod creation with unknown game slug now rejects with 422
+    response = api_client.post(
         "/pods",
         json={"event_id": event_id, "format_slug": "swiss", "game_slug": "unknown-game"},
-        headers=_auth_headers(token),
-    ).json()["id"]
-
-    response = api_client.post(
-        "/entries",
-        json={
-            "pod_id": pod_id,
-            "player_uuid": str(uuid.uuid4()),
-            "source_system": "club-checkin",
-            "metadata": {},
-        },
         headers=_auth_headers(token),
     )
 
