@@ -2702,7 +2702,385 @@ git commit -m "feat: add pod-role assignment endpoints"
 
 **Branch:** create fresh off `main` after PR3 merges — `feat/phase-5d-openapi-helm-verification`.
 
-### Task 13: Versioned OpenAPI export + drift test
+PR1's final whole-branch review found two items scoped for "before PR4's staging deploy" (issue #17, Important) and general auth/RBAC test-coverage polish (issue #16, Minor) — both slot in first, before the OpenAPI/Helm/staging-verification work, since #17 changes how `app/main.py` constructs itself and #16 touches files (`app/db.py`, `app/auth/jwks.py`, `app/auth/identity.py`, `tests/support/`) that later tasks build on.
+
+### Task 13: Fix #16 — auth/RBAC test coverage & polish
+
+**Files:**
+- Modify: `backend/app/db.py` (return type annotation)
+- Modify: `backend/tests/unit/test_config.py` (add `get_settings()` coverage)
+- Modify: `backend/tests/integration/test_rbac_models.py` (add `PodRole` FK + invalid-enum tests)
+- Modify: `backend/tests/support/jwt_helpers.py` (return annotation + docstrings)
+- Modify: `backend/tests/unit/test_jwks.py` (add `RemoteJWKSProvider` delegation test)
+- Modify: `backend/tests/unit/test_identity.py` (add non-UUID `sub` test)
+- Create: `backend/tests/support/fake_jwks.py`
+- Modify: `backend/tests/unit/test_oidc.py` (use the shared fake instead of a local copy)
+- Modify: `backend/tests/integration/test_auth_dependencies.py` (use the shared fake instead of a local copy)
+- Modify: `backend/tests/integration/conftest.py` (`test_keypair` → session-scoped)
+
+**Interfaces:** none new — this task is test coverage and cosmetic fixes only, no behavior changes to any production code path except `get_engine`'s added return annotation (purely a type hint, no runtime change).
+
+- [ ] **Step 1: `get_engine()` return type annotation**
+
+```python
+# backend/app/db.py
+from collections.abc import Iterator
+from functools import lru_cache
+
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+
+
+@lru_cache
+def get_engine() -> Engine:
+    return create_engine(get_settings().database_url, pool_pre_ping=True)
+
+
+def get_db_session() -> Iterator[Session]:
+    with Session(get_engine()) as session:
+        yield session
+```
+
+- [ ] **Step 2: Add `get_settings()` env-var-reading test coverage**
+
+```python
+# backend/tests/unit/test_config.py (append)
+import pytest
+
+from app.config import get_settings
+
+
+def test_get_settings_reads_from_environment(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host/db")
+    monkeypatch.setenv("OIDC_ISSUER", "https://issuer.example.com")
+    monkeypatch.setenv("OIDC_AUDIENCE", "aud")
+    monkeypatch.delenv("OIDC_JWKS_URL", raising=False)
+    monkeypatch.delenv("OIDC_JWKS_STATIC", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.database_url == "postgresql+psycopg://u:p@host/db"
+    assert settings.oidc_issuer == "https://issuer.example.com"
+    assert settings.oidc_audience == "aud"
+    assert settings.oidc_jwks_url is None
+    assert settings.oidc_jwks_static is None
+
+    get_settings.cache_clear()
+
+
+def test_get_settings_raises_key_error_when_a_required_var_is_missing(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("OIDC_ISSUER", "https://issuer.example.com")
+    monkeypatch.setenv("OIDC_AUDIENCE", "aud")
+    get_settings.cache_clear()
+
+    with pytest.raises(KeyError):
+        get_settings()
+
+    get_settings.cache_clear()
+```
+
+Run: `cd backend && pytest tests/unit/test_config.py -v`
+Expected: PASS (5 tests — 3 existing + 2 new)
+
+- [ ] **Step 3: `PodRole` FK + invalid-enum-value tests**
+
+```python
+# backend/tests/integration/test_rbac_models.py (append)
+from sqlalchemy.exc import DataError
+
+
+def test_pod_role_requires_existing_pod(db_session):
+    db_session.add(
+        PodRole(
+            pod_id=uuid.uuid4(),
+            player_uuid=uuid.uuid4(),
+            source_system="club-checkin",
+            role=PodRoleName.USER,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_pod_role_rejects_invalid_role_value(db_session):
+    event = _make_event(db_session)
+    pod = _make_pod(db_session, event)
+
+    db_session.execute(
+        text(
+            "INSERT INTO pod_roles (id, pod_id, player_uuid, source_system, role) "
+            "VALUES (gen_random_uuid(), :pod_id, gen_random_uuid(), 'club-checkin', 'not-a-real-role')"
+        ),
+        {"pod_id": pod.id},
+    )
+    with pytest.raises(DataError):
+        db_session.commit()
+```
+
+Add `from sqlalchemy import text` to the file's existing import block. `pod_roles.role` is a Postgres enum type — raising a plain `PodRole(role="not-a-real-role")` through the ORM would fail at the Python `Enum`/`values_callable` layer before ever reaching the DB, which wouldn't actually test the DB-level constraint; a raw `INSERT` is the only way to exercise the enum type itself. `gen_random_uuid()` requires no extra extension on Postgres 16 (built in since PG13).
+
+Run: `cd backend && pytest tests/integration/test_rbac_models.py -v`
+Expected: PASS (8 tests — 6 existing + 2 new)
+
+- [ ] **Step 4: `jwt_helpers.py` return annotation + docstrings**
+
+```python
+# backend/tests/support/jwt_helpers.py
+import json
+import time
+import uuid
+
+import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+from jwt.algorithms import RSAAlgorithm
+
+
+def generate_test_keypair(kid: str = "test-key") -> tuple[RSAPrivateKey, str]:
+    """Generate a real RSA keypair and its public JWK set (as JSON) for signing test tokens."""
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_jwk = RSAAlgorithm.to_jwk(private_key.public_key(), as_dict=True)
+    public_jwk["kid"] = kid
+    public_jwk["use"] = "sig"
+    public_jwk["alg"] = "RS256"
+    jwks_json = json.dumps({"keys": [public_jwk]})
+    return private_key, jwks_json
+
+
+def mint_token(
+    private_key,
+    *,
+    kid: str,
+    issuer: str,
+    audience: str,
+    player_uuid: uuid.UUID | str,
+    source_system: str,
+    roles: list[str] | None = None,
+    expires_in: int = 3600,
+) -> str:
+    """Sign a JWT with the given private key, shaped like OpenTourney's expected OIDC assertion."""
+    now = int(time.time())
+    claims = {
+        "iss": issuer,
+        "aud": audience,
+        "sub": str(player_uuid),
+        "source_system": source_system,
+        "roles": roles or [],
+        "iat": now,
+        "exp": now + expires_in,
+    }
+    return jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": kid})
+```
+
+- [ ] **Step 5: `RemoteJWKSProvider` delegation test**
+
+```python
+# backend/tests/unit/test_jwks.py (append)
+from unittest.mock import MagicMock, patch
+
+from app.auth.jwks import RemoteJWKSProvider
+
+
+def test_remote_provider_delegates_to_pyjwk_client():
+    # The only legitimate use of mocking in this codebase: RemoteJWKSProvider is a thin
+    # wrapper around a third-party network client (PyJWKClient), not business logic —
+    # every other test in this project exercises real crypto/DB behavior, never mocks.
+    fake_signing_key = MagicMock()
+    with patch("app.auth.jwks.PyJWKClient") as mock_client_cls:
+        mock_client_cls.return_value.get_signing_key_from_jwt.return_value = fake_signing_key
+
+        provider = RemoteJWKSProvider("https://issuer.example.com/.well-known/jwks.json")
+        result = provider.get_signing_key("some-token")
+
+        mock_client_cls.assert_called_once_with(
+            "https://issuer.example.com/.well-known/jwks.json"
+        )
+        mock_client_cls.return_value.get_signing_key_from_jwt.assert_called_once_with(
+            "some-token"
+        )
+        assert result is fake_signing_key
+```
+
+Run: `cd backend && pytest tests/unit/test_jwks.py -v`
+Expected: PASS (5 tests — 4 existing + 1 new)
+
+- [ ] **Step 6: `identity_from_claims` non-UUID `sub` test**
+
+```python
+# backend/tests/unit/test_identity.py (append)
+def test_identity_from_claims_raises_for_non_uuid_sub():
+    with pytest.raises(AuthError):
+        identity_from_claims(
+            {"sub": "not-a-uuid", "source_system": "club-checkin", "roles": []}
+        )
+```
+
+Run: `cd backend && pytest tests/unit/test_identity.py -v`
+Expected: PASS (8 tests — 7 existing + 1 new)
+
+- [ ] **Step 7: Extract the duplicated JWKS-failure test double into a shared helper**
+
+```python
+# backend/tests/support/fake_jwks.py
+import jwt
+
+
+class FakeUnreachableJWKSProvider:
+    """Simulates a JWKS source (e.g. the IdP) that cannot be reached over the network."""
+
+    def get_signing_key(self, token: str):
+        raise jwt.PyJWKClientConnectionError("simulated JWKS fetch failure")
+```
+
+In `backend/tests/unit/test_oidc.py`: delete the local `class _FakeUnreachableJWKSProvider` definition, add `from tests.support.fake_jwks import FakeUnreachableJWKSProvider` to the imports, and replace the one usage (`_FakeUnreachableJWKSProvider()`) with `FakeUnreachableJWKSProvider()`.
+
+In `backend/tests/integration/test_auth_dependencies.py`: same change — delete the local class, import `FakeUnreachableJWKSProvider` from `tests.support.fake_jwks`, replace the one usage.
+
+Run: `cd backend && pytest tests/unit/test_oidc.py tests/integration/test_auth_dependencies.py -v`
+Expected: PASS (both files, same counts as before — behavior unchanged, only the class's location moved)
+
+- [ ] **Step 8: Session-scope the `test_keypair` fixture**
+
+```python
+# backend/tests/integration/conftest.py
+@pytest.fixture(scope="session")
+def test_keypair():
+    return generate_test_keypair()
+```
+
+(Change only the decorator on the existing `test_keypair` fixture — from `@pytest.fixture()` to `@pytest.fixture(scope="session")`. `test_settings`/`make_token` stay function-scoped; they still each construct their own `Settings`/token per test, just built from one shared keypair instead of a fresh one per test. Safe because `Settings` and the key are never mutated, and every test in `tests/unit/` calls `generate_test_keypair()` directly rather than through this fixture, so they're unaffected.)
+
+- [ ] **Step 9: Run the full backend test suite + lint**
+
+Run: `cd backend && pytest -v && ruff check app tests`
+Expected: PASS, no lint errors
+
+- [ ] **Step 10: Commit**
+
+```bash
+cd backend
+git add app/db.py tests/unit/test_config.py tests/integration/test_rbac_models.py \
+  tests/support/jwt_helpers.py tests/support/fake_jwks.py tests/unit/test_jwks.py \
+  tests/unit/test_identity.py tests/unit/test_oidc.py tests/integration/test_auth_dependencies.py \
+  tests/integration/conftest.py
+git commit -m "test: close auth/RBAC coverage gaps and dedupe JWKS test double (closes #16)"
+```
+
+---
+
+### Task 14: Fix #17 — fail-fast config validation via FastAPI lifespan
+
+**Files:**
+- Modify: `backend/app/main.py`
+- Test: `backend/tests/integration/test_main_lifespan.py`
+
+**Interfaces:**
+- Produces: a `lifespan` context manager on `app.main.app` that eagerly resolves `Settings` and builds the `JWKSProvider` at ASGI startup, before any request is served.
+- Consumes: `app.config.get_settings` (Task 1), `app.auth.jwks.build_jwks_provider` (Task 4, already `@lru_cache`d — the lifespan call populates that cache once at boot; every later `Depends(get_jwks_provider)` during a request just returns the cached instance).
+
+The key design constraint: this must not break any existing test's `app.dependency_overrides[get_settings] = lambda: test_settings` pattern (used throughout PR2/PR3's `api_client` fixture and PR1's `test_auth_dependencies.py`). A lifespan function that called the real `get_settings()` directly would bypass overrides entirely (`dependency_overrides` only intercepts `Depends(...)` resolution during request handling, not arbitrary direct calls) and break every existing integration test, since none of them set real `DATABASE_URL`/`OIDC_*` environment variables. The fix: have `lifespan` check `app.dependency_overrides` itself before falling back to the real function — the same dict FastAPI's own resolver consults.
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# backend/tests/integration/test_main_lifespan.py
+import pytest
+from fastapi.testclient import TestClient
+
+from app.config import get_settings
+from app.main import app
+
+
+def test_lifespan_eagerly_resolves_settings_at_startup(monkeypatch):
+    calls = []
+
+    def spy_get_settings():
+        calls.append(True)
+        raise KeyError("DATABASE_URL")  # short-circuits before build_jwks_provider runs
+
+    monkeypatch.setattr("app.main.get_settings", spy_get_settings)
+
+    with pytest.raises(KeyError):
+        with TestClient(app):
+            pass
+
+    assert calls, "lifespan should call get_settings() at startup, before serving any request"
+
+
+def test_lifespan_respects_dependency_overrides(test_settings):
+    app.dependency_overrides[get_settings] = lambda: test_settings
+    try:
+        with TestClient(app):
+            pass  # must not raise — test_settings carries a valid static JWKS
+    finally:
+        app.dependency_overrides.clear()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && pytest tests/integration/test_main_lifespan.py -v`
+Expected: FAIL — `test_lifespan_eagerly_resolves_settings_at_startup` fails because nothing calls `get_settings()` at startup yet (no `KeyError` raised, `calls` stays empty)
+
+- [ ] **Step 3: Add the lifespan handler to `app/main.py`**
+
+```python
+# backend/app/main.py
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.auth.jwks import build_jwks_provider
+from app.config import get_settings
+from app.routers import entries, events, pod_roles, pods
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    resolve_settings = app.dependency_overrides.get(get_settings, get_settings)
+    settings = resolve_settings()
+    build_jwks_provider(settings)
+    yield
+
+
+app = FastAPI(title="OpenTourney", lifespan=lifespan)
+app.include_router(events.router)
+app.include_router(pods.router)
+app.include_router(entries.router)
+app.include_router(pod_roles.router)
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+```
+
+Scope note: `build_jwks_provider` validates that *some* JWKS source is configured (raises `RuntimeError` if neither `OIDC_JWKS_STATIC` nor `OIDC_JWKS_URL` is set) and, for the static path, parses the JWK set immediately — both real boot-time failures. For the remote path, `PyJWKClient` itself fetches lazily (on first `get_signing_key_from_jwt` call, not at construction), so an unreachable-but-configured `OIDC_JWKS_URL` still won't be caught until the first real request — that's a `PyJWKClient` behavior this task doesn't change, and forcing an eager fetch at every boot would add startup latency for a check that's better handled by the existing `AuthServiceUnavailableError` → 503 mapping (PR1) anyway.
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd backend && pytest tests/integration/test_main_lifespan.py -v`
+Expected: PASS (2 tests)
+
+- [ ] **Step 5: Run the full backend test suite + lint**
+
+Run: `cd backend && pytest -v && ruff check app tests`
+Expected: PASS, no lint errors — this is the critical check for this task: every existing PR2/PR3 router test uses `api_client`, which triggers this same lifespan on every `with TestClient(...)`, so a regression here would fail broadly, not just in the new test file.
+
+- [ ] **Step 6: Commit**
+
+```bash
+cd backend
+git add app/main.py tests/integration/test_main_lifespan.py
+git commit -m "feat: fail fast on misconfiguration at startup instead of first request (closes #17)"
+```
+
+---
+
+### Task 15: Versioned OpenAPI export + drift test
 
 **Files:**
 - Modify: `backend/app/main.py` (set `version=` from package metadata)
@@ -2716,15 +3094,33 @@ git commit -m "feat: add pod-role assignment endpoints"
 
 - [ ] **Step 1: Set the app version from package metadata**
 
+Task 14 already added the `lifespan` handler — this step only adds `version=`, keeping everything else as Task 14 left it:
+
 ```python
 # backend/app/main.py
+from contextlib import asynccontextmanager
 from importlib.metadata import version as _pkg_version
 
 from fastapi import FastAPI
 
+from app.auth.jwks import build_jwks_provider
+from app.config import get_settings
 from app.routers import entries, events, pod_roles, pods
 
-app = FastAPI(title="OpenTourney", version=_pkg_version("opentourney-backend"))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    resolve_settings = app.dependency_overrides.get(get_settings, get_settings)
+    settings = resolve_settings()
+    build_jwks_provider(settings)
+    yield
+
+
+app = FastAPI(
+    title="OpenTourney",
+    version=_pkg_version("opentourney-backend"),
+    lifespan=lifespan,
+)
 app.include_router(events.router)
 app.include_router(pods.router)
 app.include_router(entries.router)
@@ -2816,7 +3212,7 @@ git commit -m "feat: publish a versioned, drift-checked OpenAPI spec"
 
 ---
 
-### Task 14: Docs site link
+### Task 16: Docs site link
 
 **Files:**
 - Modify: `docs/conf.py`
@@ -2870,7 +3266,7 @@ git commit -m "docs: link the published OpenAPI spec from the docs site"
 
 ---
 
-### Task 15: Helm chart — secrets + env wiring
+### Task 17: Helm chart — secrets + env wiring
 
 **Files:**
 - Create: `charts/opentourney/templates/secret.yaml`
@@ -2939,7 +3335,7 @@ git commit -m "feat: wire DATABASE_URL and OIDC settings into the backend Deploy
 
 ---
 
-### Task 16: Staging test-token minting script
+### Task 18: Staging test-token minting script
 
 **Files:**
 - Create: `backend/scripts/mint_test_token.py`
@@ -3081,7 +3477,7 @@ git commit -m "feat: add staging test-token minting script"
 
 ---
 
-### Task 17: Manual verification against staging (mandatory pre-merge gate)
+### Task 19: Manual verification against staging (mandatory pre-merge gate)
 
 Per the mandatory manual-verification gate: build and push images from this branch, deploy to the `opentourney-staging` namespace on the cube cluster (staging-before-main-merge workflow), run migrations, generate a one-time staging test keypair, then work through this checklist and report pass/fail per item before asking to merge.
 
@@ -3125,4 +3521,4 @@ Pass the printed JSON as `--set-string secrets.oidcJwksStatic='...'` on the stag
 
 Fix any findings with follow-up commits on this branch before merging.
 
-**End of PR4 and Phase 5.** Once PR4 is approved, manually verified, and merged (never merge without explicit in-the-moment approval), close GitHub issue #5, delete the branch, and output the next-phase prompt for Phase 6 (Match & tournament reporting) per the standard phase-completion trigger.
+**End of PR4 and Phase 5.** Once PR4 is approved, manually verified, and merged (never merge without explicit in-the-moment approval), close GitHub issues #5, #16 (Task 13), and #17 (Task 14), delete the branch, and output the next-phase prompt for Phase 6 (Match & tournament reporting) per the standard phase-completion trigger.

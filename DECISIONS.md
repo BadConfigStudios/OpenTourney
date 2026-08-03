@@ -204,6 +204,20 @@ routers; **PR3** Entries CRUD + GameModule wiring + pod-role-assignment
 endpoints; **PR4** OpenAPI export/CI drift-check + Helm/staging wiring +
 manual verification. Issue #5 stays open across all four, closed after PR4.
 
+## 2026-08-02 — Issues #16/#17 (PR1 deferred findings) slotted into PR4, ahead of the OpenAPI/Helm tasks
+
+PR1's final whole-branch review deferred two items rather than fixing them
+inline: issue #16 (Minor — auth/RBAC test-coverage and polish gaps) and
+issue #17 (Important — move `Settings`/`JWKSProvider` construction to a
+FastAPI startup `lifespan` so misconfiguration fails at boot instead of on
+first request). Both are now Tasks 13–14 of PR4's plan, running *before*
+the OpenAPI export/Helm/staging-verification tasks (renumbered 15–19),
+since issue #17 changes how `app/main.py` constructs the app (every later
+PR4 task touching `app/main.py` needs to build on top of the `lifespan`
+wrapper, not before it) and issue #16 touches shared test infrastructure
+(`tests/support/`) that's cheaper to land before the staging-verification
+pass than after.
+
 ## 2026-08-02 — Swiss scoring: 3/1/0 match points, byes count as a win
 
 Standard Play!-style Swiss scoring (win = 3, tie = 1, loss = 0; a bye
