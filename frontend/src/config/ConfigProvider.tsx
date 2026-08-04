@@ -28,6 +28,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         return response.json() as Promise<AppConfig>;
       })
       .then((config) => {
+        if (!Array.isArray(config.personas) || config.personas.length === 0) {
+          throw new Error("config.json has no personas or personas is not an array");
+        }
         if (!cancelled) setState({ status: "ready", config });
       })
       .catch(() => {

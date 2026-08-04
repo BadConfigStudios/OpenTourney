@@ -53,4 +53,21 @@ describe("ConfigProvider", () => {
       expect(screen.getByText(/failed to load app configuration/i)).toBeInTheDocument(),
     );
   });
+
+  it("shows a fatal error if config.json has no personas", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) })) as unknown as typeof fetch,
+    );
+
+    render(
+      <ConfigProvider>
+        <Probe />
+      </ConfigProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/failed to load app configuration/i)).toBeInTheDocument(),
+    );
+  });
 });
