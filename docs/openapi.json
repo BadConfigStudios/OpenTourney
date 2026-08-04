@@ -233,6 +233,24 @@
         "title": "MatchResult",
         "type": "string"
       },
+      "MatchResultUpdate": {
+        "properties": {
+          "result": {
+            "enum": [
+              "entry1_win",
+              "entry2_win",
+              "tie"
+            ],
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "title": "MatchResultUpdate",
+        "type": "object"
+      },
       "PodCreate": {
         "properties": {
           "event_id": {
@@ -947,6 +965,64 @@
           }
         },
         "summary": "Healthz"
+      }
+    },
+    "/matches/{match_id}/result": {
+      "post": {
+        "operationId": "report_match_result_matches__match_id__result_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchResultUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Report Match Result",
+        "tags": [
+          "matches"
+        ]
       }
     },
     "/pods": {
