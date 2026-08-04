@@ -61,6 +61,7 @@ behind each decision reflected here.
 | NFR3 | Every phase verified against the real Kubernetes staging environment, not deferred to a final integration phase |
 | NFR4 | OpenTourney owns no accounts or passwords; authentication is always externally asserted |
 | NFR5 | `TournamentFormat` and `GameModule` plugin interfaces stay fully decoupled — neither assumes anything about the other |
+| NFR6 | Published OpenAPI contract carries more than the schema shape: realistic constraints (e.g. field limits, valid enum ranges) and fake/mock example payloads per endpoint, so third-party API consumers (BR2) can integrate and test against the contract without a live instance — good-citizen API publishing, not required for MVP1 completion, tracked for post-MVP1 |
 
 ## MVP Breakdown
 
