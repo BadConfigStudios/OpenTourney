@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from app.formats.base import Pairing, TournamentFormat
+from app.formats.base import Pairing, StandingRow, TournamentFormat
 from app.models import Entry, MatchResult, Round
 
 WIN_POINTS = 3
@@ -32,6 +32,16 @@ class SwissFormat(TournamentFormat):
 
         return _assign_tables(pairings)
 
+    def compute_standings(
+        self, entries: Sequence[Entry], rounds: Sequence[Round]
+    ) -> list[StandingRow]:
+        standings, _ = _compute_standings(entries, rounds)
+        ranked = _rank_entries(entries, standings)
+        return [
+            StandingRow(entry_id=entry.id, points=standings.get(entry.id, 0), rank=i + 1)
+            for i, entry in enumerate(ranked)
+        ]
+
 
 def _compute_standings(
     entries: Sequence[Entry], previous_rounds: Sequence[Round]
@@ -57,9 +67,7 @@ def _compute_standings(
                 # Catches UNREPORTED and also `None` (an unflushed Match whose
                 # mapped_column default hasn't fired yet at INSERT time) — both
                 # mean this match doesn't have a scoreable result.
-                raise ValueError(
-                    f"round {round_.number} has an unreported match; cannot generate the next round"
-                )
+                raise ValueError(f"round {round_.number} has an unreported match")
 
     return standings, bye_used
 

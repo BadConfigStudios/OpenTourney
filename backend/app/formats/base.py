@@ -13,6 +13,13 @@ class Pairing:
     table_number: int | None = None
 
 
+@dataclass(frozen=True)
+class StandingRow:
+    entry_id: uuid.UUID
+    points: int
+    rank: int
+
+
 class TournamentFormat(ABC):
     slug: str
 
@@ -21,3 +28,9 @@ class TournamentFormat(ABC):
         self, entries: Sequence[Entry], previous_rounds: Sequence[Round]
     ) -> list[Pairing]:
         """Return this pod's next round's pairings given its entries and completed prior rounds."""
+
+    @abstractmethod
+    def compute_standings(
+        self, entries: Sequence[Entry], rounds: Sequence[Round]
+    ) -> list[StandingRow]:
+        """Return ranked standings for all entries given completed rounds."""

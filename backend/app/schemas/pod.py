@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,3 +22,4 @@ class PodRead(BaseModel):
     event_id: uuid.UUID
     format_slug: str
     game_slug: str
+    completed_at: datetime | None

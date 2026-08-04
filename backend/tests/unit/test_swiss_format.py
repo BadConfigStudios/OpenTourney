@@ -285,3 +285,60 @@ def test_bye_rotates_away_from_round_one_recipient_in_round_two():
     assert bye_pairings[0].table_number is None
     real_pairings = [p for p in pairings if p.entry2_id is not None]
     assert sorted(p.table_number for p in real_pairings) == [1, 2]
+
+
+def test_compute_standings_ranks_by_points_descending():
+    e1, e2, e3, e4 = _entry(), _entry(), _entry(), _entry()
+    round1 = _round(
+        1,
+        [
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e1.id,
+                entry2_id=e2.id,
+                result=MatchResult.ENTRY1_WIN,
+            ),
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e3.id,
+                entry2_id=e4.id,
+                result=MatchResult.TIE,
+            ),
+        ],
+    )
+
+    standings = SwissFormat().compute_standings([e1, e2, e3, e4], [round1])
+
+    assert [row.entry_id for row in standings][0] == e1.id
+    assert [row.points for row in standings] == [3, 1, 1, 0]
+    assert [row.rank for row in standings] == [1, 2, 3, 4]
+
+
+def test_compute_standings_with_no_rounds_ranks_all_entries_at_zero_points():
+    e1, e2 = _entry(), _entry()
+
+    standings = SwissFormat().compute_standings([e1, e2], [])
+
+    assert {row.points for row in standings} == {0}
+    assert sorted(row.rank for row in standings) == [1, 2]
+
+
+def test_compute_standings_method_raises_on_unreported_match():
+    e1, e2 = _entry(), _entry()
+    round1 = _round(
+        1,
+        [
+            Match(
+                id=uuid.uuid4(),
+                round_id=uuid.uuid4(),
+                entry1_id=e1.id,
+                entry2_id=e2.id,
+                result=MatchResult.UNREPORTED,
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="unreported"):
+        SwissFormat().compute_standings([e1, e2], [round1])

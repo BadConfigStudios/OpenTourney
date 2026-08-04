@@ -170,6 +170,18 @@
       },
       "PodRead": {
         "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
           "event_id": {
             "format": "uuid",
             "title": "Event Id",
@@ -193,7 +205,8 @@
           "id",
           "event_id",
           "format_slug",
-          "game_slug"
+          "game_slug",
+          "completed_at"
         ],
         "title": "PodRead",
         "type": "object"

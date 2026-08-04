@@ -2,6 +2,7 @@ import uuid
 from datetime import date
 
 import pytest
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Event, Pod
@@ -43,3 +44,30 @@ def test_pod_event_id_is_unique_at_db_level(db_session):
     db_session.add(Pod(event_id=event.id, format_slug="swiss", game_slug="pokemon-tcg"))
     with pytest.raises(IntegrityError):
         db_session.commit()
+
+
+def test_pod_completed_at_defaults_to_none(db_session):
+    event = Event(date=date(2026, 9, 1))
+    db_session.add(event)
+    db_session.flush()
+
+    pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
+    db_session.add(pod)
+    db_session.commit()
+
+    assert pod.completed_at is None
+
+
+def test_pod_completed_at_can_be_set(db_session):
+    event = Event(date=date(2026, 9, 1))
+    db_session.add(event)
+    db_session.flush()
+    pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
+    db_session.add(pod)
+    db_session.commit()
+
+    pod.completed_at = func.now()
+    db_session.commit()
+    db_session.refresh(pod)
+
+    assert pod.completed_at is not None
