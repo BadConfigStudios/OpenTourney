@@ -354,6 +354,20 @@ def test_non_organizer_cannot_complete_pod(api_client, make_token):
     assert response.status_code == 403
 
 
+def test_updating_pod_after_completion_is_rejected(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    response = api_client.patch(
+        f"/pods/{pod_id}",
+        json={"format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 409
+
+
 def test_report_is_empty_for_pod_with_no_entries(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, token)

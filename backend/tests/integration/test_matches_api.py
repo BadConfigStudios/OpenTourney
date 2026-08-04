@@ -145,6 +145,21 @@ def test_reporting_a_bye_match_result_is_rejected(api_client, make_token):
     assert response.status_code == 409
 
 
+def test_reporting_result_rejected_after_pod_is_complete(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id, match_id = _pod_with_one_match(api_client, token)
+    api_client.post(
+        f"/matches/{match_id}/result", json={"result": "entry1_win"}, headers=_auth_headers(token)
+    )
+    api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    response = api_client.post(
+        f"/matches/{match_id}/result", json={"result": "entry2_win"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 409
+
+
 def test_reporting_result_for_unknown_match_is_not_found(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
 

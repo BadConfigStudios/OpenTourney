@@ -104,6 +104,8 @@ def update_pod(
     pod = db.get(Pod, pod_id)
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
+    if pod.completed_at is not None:
+        raise HTTPException(status_code=409, detail="pod is already complete")
     _validate_game_slug(payload.game_slug)
     pod.format_slug = payload.format_slug
     pod.game_slug = payload.game_slug

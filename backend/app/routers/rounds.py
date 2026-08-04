@@ -28,6 +28,8 @@ def generate_round(
     db: Session = Depends(get_db_session),
 ) -> Round:
     pod = _get_pod_or_404(db, pod_id)
+    if pod.completed_at is not None:
+        raise HTTPException(status_code=409, detail="pod is already complete")
 
     tournament_format = get_tournament_format_or_422(pod)
 
