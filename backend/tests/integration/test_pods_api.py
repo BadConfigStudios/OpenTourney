@@ -426,6 +426,41 @@ def test_report_is_partial_when_current_round_has_unreported_matches(api_client,
     assert {row["points"] for row in body["standings"]} == {0}
 
 
+def test_stranger_without_pod_access_cannot_view_report(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, owner_token)
+
+    # A stranger who is neither the pod's event organizer nor holds a PodRole on
+    # this pod fails require_pod_access's `pod_access_allowed` check, regardless of
+    # whether they hold an organizer claim elsewhere/for a different event.
+    stranger_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(stranger_token))
+
+    assert response.status_code == 403
+
+
+def test_report_for_unknown_pod_is_not_found(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.get(f"/pods/{uuid.uuid4()}/report", headers=_auth_headers(token))
+
+    assert response.status_code == 404
+
+
+def test_report_for_unrecognized_format_slug_is_rejected(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    event_id = _create_event(api_client, token)
+    pod_id = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "single-elim", "game_slug": "generic"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token))
+
+    assert response.status_code == 422
+
+
 def test_report_marks_is_complete_after_pod_completion(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, token)
