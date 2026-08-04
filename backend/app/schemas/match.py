@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -16,3 +17,7 @@ class MatchRead(BaseModel):
     reported_by: str | None
     witnessed_by: str | None
     table_number: int | None
+
+
+class MatchResultUpdate(BaseModel):
+    result: Literal[MatchResult.ENTRY1_WIN, MatchResult.ENTRY2_WIN, MatchResult.TIE]
