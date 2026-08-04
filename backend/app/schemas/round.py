@@ -1,4 +1,3 @@
-# backend/app/schemas/round.py
 import uuid
 
 from pydantic import BaseModel, ConfigDict

@@ -1,4 +1,3 @@
-# backend/tests/integration/test_rounds_api.py
 import uuid
 
 from app.models import Match, MatchResult, Round

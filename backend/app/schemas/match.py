@@ -1,4 +1,3 @@
-# backend/app/schemas/match.py
 import uuid
 
 from pydantic import BaseModel, ConfigDict

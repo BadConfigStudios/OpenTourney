@@ -1,4 +1,3 @@
-# backend/app/routers/rounds.py
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -82,5 +81,4 @@ def list_rounds(
     identity: Identity = Depends(require_pod_access),
     db: Session = Depends(get_db_session),
 ) -> list[Round]:
-    _get_pod_or_404(db, pod_id)
     return db.query(Round).filter_by(pod_id=pod_id).order_by(Round.number).all()
