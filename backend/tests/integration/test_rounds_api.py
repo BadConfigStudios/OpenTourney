@@ -132,6 +132,18 @@ def test_organizer_can_list_rounds_with_nested_matches(api_client, make_token):
     assert len(body[0]["matches"]) == 1
 
 
+def test_round_generation_rejected_after_pod_is_complete(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    _add_entry(api_client, token, pod_id)
+    _add_entry(api_client, token, pod_id)
+    api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    response = api_client.post(f"/pods/{pod_id}/rounds", headers=_auth_headers(token))
+
+    assert response.status_code == 409
+
+
 def test_pod_role_without_organizer_claim_can_list_rounds(api_client, make_token):
     owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, owner_token)

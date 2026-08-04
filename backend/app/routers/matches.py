@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_identity, pod_staff_allowed
 from app.auth.identity import Identity
 from app.db import get_db_session
-from app.models import Match, Round
+from app.models import Match, Pod, Round
 from app.schemas.match import MatchRead, MatchResultUpdate
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -37,6 +37,10 @@ def report_match_result(
     if round_ is None:
         raise HTTPException(status_code=404, detail="round not found")
     _require_pod_staff(db, identity, round_.pod_id)
+
+    pod = db.get(Pod, round_.pod_id)
+    if pod is not None and pod.completed_at is not None:
+        raise HTTPException(status_code=409, detail="pod is already complete")
 
     if match.entry2_id is None:
         raise HTTPException(status_code=409, detail="bye matches do not require a result")
