@@ -167,7 +167,10 @@ def get_pod_report(
         usable_rounds = usable_rounds[:-1]
         is_partial = True
 
-    standings = tournament_format.compute_standings(all_entries, usable_rounds)
+    try:
+        standings = tournament_format.compute_standings(all_entries, usable_rounds)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return PodReport(
         is_complete=pod.completed_at is not None,
