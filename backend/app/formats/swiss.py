@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from app.formats.base import Pairing, TournamentFormat
+from app.formats.base import Pairing, StandingRow, TournamentFormat
 from app.models import Entry, MatchResult, Round
 
 WIN_POINTS = 3
@@ -31,6 +31,16 @@ class SwissFormat(TournamentFormat):
             pairings.append(Pairing(entry1_id=bye_entry.id, entry2_id=None))
 
         return _assign_tables(pairings)
+
+    def compute_standings(
+        self, entries: Sequence[Entry], rounds: Sequence[Round]
+    ) -> list[StandingRow]:
+        standings, _ = _compute_standings(entries, rounds)
+        ranked = _rank_entries(entries, standings)
+        return [
+            StandingRow(entry_id=entry.id, points=standings.get(entry.id, 0), rank=i + 1)
+            for i, entry in enumerate(ranked)
+        ]
 
 
 def _compute_standings(
