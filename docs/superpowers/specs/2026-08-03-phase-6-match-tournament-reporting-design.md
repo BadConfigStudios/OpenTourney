@@ -58,10 +58,14 @@ def get_tournament_format(slug: str) -> TournamentFormat:
         raise ValueError(f"unknown tournament format slug: {slug!r}") from None
 ```
 
-Closes a small pre-existing gap while here: `POST /pods` validates
-`game_slug` but not `format_slug` (`app/routers/pods.py`). Add the same
-`try/except ValueError -> 422` guard for `format_slug` using this registry,
-matching `_validate_game_slug`'s existing shape.
+Per the existing `game_slug` precedent (`DECISIONS.md`, "`game_slug`
+validated at Entry creation, not Pod creation"), `format_slug` is
+deliberately *not* validated at `POST /pods`/`PATCH /pods/{id}` — same
+deliberate gap, same reasoning: the only place `format_slug` is actually
+dereferenced is round generation. `POST /pods/{pod_id}/rounds` wraps its
+`get_tournament_format(pod.format_slug)` call in `try/except ValueError`
+→ 422, mirroring how `create_entry`/`update_entry` guard
+`get_game_module`.
 
 ### `SwissFormat.compute_standings` (rename/publicize)
 
@@ -129,7 +133,7 @@ Follows the existing hand-written revision convention
 
 | Method | Path | RBAC | Behavior |
 |---|---|---|---|
-| POST | `/pods/{pod_id}/rounds` | `require_pod_organizer` | Loads pod's entries + prior rounds (ordered), calls `get_tournament_format(pod.format_slug).generate_round(...)`, persists `Round` (next `number`) + `Match` rows. Catches the format's `ValueError` (unreported prior match) → 409. If pod has zero entries → 409 ("pod has no entries"). Returns the created round + matches. |
+| POST | `/pods/{pod_id}/rounds` | `require_pod_organizer` | Two separate `try/except ValueError` blocks, same shape as `entries.py`'s `_get_validated_game_module` vs. `validate_entry_metadata` split: (1) `get_tournament_format(pod.format_slug)` → 422 on an unrecognized slug; (2) `.generate_round(entries, previous_rounds)` → 409 on an unreported prior match. Loads pod's entries + prior rounds (ordered), persists `Round` (next `number`) + `Match` rows on success. If pod has zero entries → 409 ("pod has no entries"). Returns the created round + matches. |
 | GET | `/pods/{pod_id}/rounds` | `require_pod_access` | Lists rounds (ordered by `number`) with nested matches. For visibility/testing and the Phase 7 UI later. |
 | POST | `/matches/{match_id}/result` | `require_pod_staff` (resolved via `match.round.pod_id`) | Body: `{result: MatchResult}`, must be `ENTRY1_WIN`/`ENTRY2_WIN`/`TIE` (reject `UNREPORTED` as invalid input, 422). 409 if `match.entry2_id is None` (bye — already auto-scored, nothing to report). Sets `result`, and `reported_by = witnessed_by = f"{identity.source_system}:{identity.player_uuid}"` — both fields always equal the caller's identity, since `require_pod_staff` already guarantees Organizer-or-Scorekeeper. Overwrites allowed (correcting a mis-entered result), no extra guard. |
 | POST | `/pods/{pod_id}/complete` | `require_pod_organizer` | 409 if `pod.completed_at` already set. 409 if any existing round has an unreported non-bye match (reuses the format's standings computation to detect this, same as round-generation's check). Otherwise sets `completed_at = now()`. Callable after any round, regardless of whether some future target is "reached" — this phase has no target concept, so completion is always the organizer's explicit call. |
