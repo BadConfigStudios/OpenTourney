@@ -15,6 +15,28 @@ def _create_event(api_client, token) -> str:
     return response.json()["id"]
 
 
+def _create_pod(api_client, token) -> str:
+    event_id = _create_event(api_client, token)
+    return api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "generic"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+
+def _add_entry(api_client, token, pod_id) -> str:
+    return api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+
 def test_organizer_creates_pod_for_own_event(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     event_id = _create_event(api_client, token)
@@ -288,3 +310,45 @@ def test_update_pod_with_unknown_game_slug_is_rejected(api_client, make_token):
     )
 
     assert response.status_code == 422
+
+
+def test_organizer_completes_pod_with_no_rounds(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+
+    response = api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json()["completed_at"] is not None
+
+
+def test_completing_already_complete_pod_is_rejected(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    response = api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    assert response.status_code == 409
+
+
+def test_completing_pod_with_unreported_match_is_rejected(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    _add_entry(api_client, token, pod_id)
+    _add_entry(api_client, token, pod_id)
+    api_client.post(f"/pods/{pod_id}/rounds", headers=_auth_headers(token))
+
+    response = api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    assert response.status_code == 409
+
+
+def test_non_organizer_cannot_complete_pod(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, owner_token)
+
+    stranger_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    response = api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(stranger_token))
+
+    assert response.status_code == 403
