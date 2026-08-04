@@ -10,12 +10,26 @@ def test_tournament_format_is_abstract():
         TournamentFormat()
 
 
+def test_format_missing_compute_standings_cannot_be_instantiated():
+    class IncompleteFormat(TournamentFormat):
+        slug = "incomplete"
+
+        def generate_round(self, entries, previous_rounds):
+            return []
+
+    with pytest.raises(TypeError):
+        IncompleteFormat()
+
+
 def test_concrete_format_implements_generate_round():
     class StubFormat(TournamentFormat):
         slug = "stub"
 
         def generate_round(self, entries, previous_rounds):
             return [Pairing(entry1_id=uuid.uuid4(), entry2_id=None)]
+
+        def compute_standings(self, entries, rounds):
+            return []
 
     pairings = StubFormat().generate_round(entries=[], previous_rounds=[])
 
