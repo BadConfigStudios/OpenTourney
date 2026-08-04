@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,3 +17,4 @@ class Pod(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     format_slug: Mapped[str] = mapped_column(nullable=False)
     game_slug: Mapped[str] = mapped_column(nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
