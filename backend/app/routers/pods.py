@@ -14,7 +14,7 @@ from app.auth.dependencies import (
 )
 from app.auth.identity import Identity
 from app.db import get_db_session
-from app.formats.registry import get_tournament_format
+from app.formats.registry import get_tournament_format_or_422
 from app.games.registry import get_game_module
 from app.models import Entry, Match, MatchResult, Pod, Round
 from app.models.rbac import PodRole
@@ -154,13 +154,7 @@ def get_pod_report(
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
 
-    try:
-        tournament_format = get_tournament_format(pod.format_slug)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=f"pod's format_slug {pod.format_slug!r} is not a recognized tournament format",
-        ) from exc
+    tournament_format = get_tournament_format_or_422(pod)
 
     all_entries = db.query(Entry).filter_by(pod_id=pod_id).order_by(Entry.id).all()
     all_rounds = db.query(Round).filter_by(pod_id=pod_id).order_by(Round.number).all()

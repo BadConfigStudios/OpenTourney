@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_pod_access, require_pod_organizer
 from app.auth.identity import Identity
 from app.db import get_db_session
-from app.formats.registry import get_tournament_format
+from app.formats.registry import get_tournament_format_or_422
 from app.models import Entry, Match, Pod, Round
 from app.schemas.round import RoundRead
 
@@ -29,13 +29,7 @@ def generate_round(
 ) -> Round:
     pod = _get_pod_or_404(db, pod_id)
 
-    try:
-        tournament_format = get_tournament_format(pod.format_slug)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=f"pod's format_slug {pod.format_slug!r} is not a recognized tournament format",
-        ) from exc
+    tournament_format = get_tournament_format_or_422(pod)
 
     entries = db.query(Entry).filter_by(pod_id=pod_id).order_by(Entry.id).all()
     if not entries:
