@@ -14,15 +14,23 @@ authenticated via a persona switcher that swaps which pre-minted Bearer
 token the API client attaches (no real login flow, per DECISIONS.md
 2026-08-03).
 
-## Scope gap found during design
+## Backend API this phase builds against
 
-`SwissFormat.compute_standings` (ranked `StandingRow` list) exists as pure
-logic in `backend/app/formats/swiss.py` but is never exposed over HTTP —
-there is no `GET /pods/{id}/standings`-shaped endpoint, and nothing sets
-`Pod.completed_at`. FR18 (tournament-completion detection) and FR22 (final
-report display) have no API to build against. This phase adds that
-endpoint as its first PR rather than deferring FR22, keeping the UI
-API-first (NFR2) instead of reimplementing standings math in TypeScript.
+Phase 6 PR4 (#34, merged 2026-08-04) already shipped the completion/report
+API this phase needs — no backend work required before starting the
+frontend:
+
+- `POST /pods/{id}/complete` (Organizer-gated): sets `Pod.completed_at`,
+  409s if already complete or if the latest round has an unreported match.
+- `GET /pods/{id}/report` (pod-access-gated): returns
+  `PodReport { is_complete, rounds_played, is_partial, standings: [StandingRowRead { entry_id, points, rank }] }`.
+  `is_partial: true` means the latest round isn't fully reported yet, so
+  standings reflect only completed rounds — the UI should surface that
+  distinction rather than presenting a partial report as final.
+
+(An earlier draft of this spec, written before rebasing onto a stale local
+`main`, incorrectly described this as a missing endpoint to be added in
+Phase 7. Corrected here — no PR1 backend work needed.)
 
 ## Architecture
 
@@ -51,6 +59,7 @@ every call. Switching persona clears the React Query cache
 
 **RBAC gating in UI** (convenience only — backend remains the actual
 enforcement point per NFR2/FR15, this doesn't change any trust boundary):
+
 - Organizer-wide actions: gated by which persona is selected (Organizer
   persona = organizer everywhere).
 - Pod-scoped Scorekeeper actions (match result entry): gated via existing
@@ -78,7 +87,7 @@ to exactly one Pod per Event (FR8) — no separate pod-list screen.
 | `/events/new` | Create Event form | Organizer |
 | `/events/:eventId` | Event detail: auto-shows its one Pod (create-Pod form if none), Entry roster CRUD | Organizer for mutations, all personas can view |
 | `/pods/:podId/pairings` | Current round: pairings + seating (`table_number`), inline BO1 result entry, "Generate Next Round", round-history selector (past rounds read-only) | Organizer generates rounds; Organizer/Scorekeeper (per pod-role check) enter results |
-| `/pods/:podId/report` | Final standings/placement (ranked `StandingRow` list) | Viewable once pod complete |
+| `/pods/:podId/report` | Standings/placement via `GET /pods/{id}/report` (`is_complete`, `rounds_played`, `is_partial`, ranked `standings`) — reachable any time, banner shown when `is_partial` (latest round not fully reported) or `!is_complete` (Organizer hasn't hit "Complete Pod" yet) so a mid-tournament view is never mistaken for final | Viewable by all personas; "Complete Pod" action Organizer-only |
 
 ## Error handling
 
@@ -107,8 +116,8 @@ to exactly one Pod per Event (FR8) — no separate pod-list screen.
   app, using the existing `api_client`/`make_token` fixture pattern from
   `backend/tests/integration/test_matches_api.py` — e.g. full
   create-event → create-pod → add-entries flow, and
-  generate-round → report-result → generate-next-round → view-report
-  flow.
+  generate-round → report-result → generate-next-round → complete-pod →
+  view-report flow.
 - **Acceptance**: mandatory manual verification gate — browser walkthrough
   per persona (Organizer/Scorekeeper/Player) against staging before each
   PR merges.
@@ -124,18 +133,16 @@ to exactly one Pod per Event (FR8) — no separate pod-list screen.
 - **NFR6** (new, added to REQUIREMENTS.md this session): publish OpenAPI
   contract metadata beyond schema shape — realistic constraints and
   fake/mock example payloads per endpoint, so third-party API consumers
-  (BR2) can integrate/test without a live instance. Post-MVP1.
-  Opportunistic note: since the new standings endpoint (PR1 below) is new
-  surface area anyway, adding FastAPI/Pydantic `json_schema_extra`
-  examples to it is low-LOE and a reasonable first step, but not required
-  to close this phase.
+  (BR2) can integrate/test without a live instance. Post-MVP1, not
+  required to close this phase.
 
 ## Planned PR breakdown (for writing-plans)
 
-1. Backend: `GET /pods/{id}/standings` (ranked `StandingRow` list) +
-   completion detection, sets `Pod.completed_at`.
-2. Frontend app shell: config loader, persona switcher, `apiClient`,
+No backend PR needed — `POST /pods/{id}/complete` and
+`GET /pods/{id}/report` already exist (Phase 6 PR4, #34).
+
+1. Frontend app shell: config loader, persona switcher, `apiClient`,
    router skeleton, Tailwind setup.
-3. Event/Pod/Entry setup screens (FR19).
-4. Pairings/seating + scoring screens (FR20, FR21).
-5. Final report screen (FR22).
+2. Event/Pod/Entry setup screens (FR19).
+3. Pairings/seating + scoring screens (FR20, FR21).
+4. Final report screen (FR22, consumes `GET /pods/{id}/report`).
