@@ -2,6 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_pod_access, require_pod_organizer
@@ -52,18 +53,25 @@ def generate_round(
 
     round_ = Round(pod_id=pod_id, number=len(previous_rounds) + 1)
     db.add(round_)
-    db.flush()
 
-    for pairing in pairings:
-        db.add(
-            Match(
-                round_id=round_.id,
-                entry1_id=pairing.entry1_id,
-                entry2_id=pairing.entry2_id,
-                table_number=pairing.table_number,
+    try:
+        db.flush()
+
+        for pairing in pairings:
+            db.add(
+                Match(
+                    round_id=round_.id,
+                    entry1_id=pairing.entry1_id,
+                    entry2_id=pairing.entry2_id,
+                    table_number=pairing.table_number,
+                )
             )
-        )
-    db.commit()
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="round already generated for this pod"
+        ) from None
     db.refresh(round_)
     return round_
 
