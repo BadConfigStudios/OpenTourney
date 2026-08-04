@@ -67,9 +67,7 @@ def _compute_standings(
                 # Catches UNREPORTED and also `None` (an unflushed Match whose
                 # mapped_column default hasn't fired yet at INSERT time) — both
                 # mean this match doesn't have a scoreable result.
-                raise ValueError(
-                    f"round {round_.number} has an unreported match; cannot generate the next round"
-                )
+                raise ValueError(f"round {round_.number} has an unreported match")
 
     return standings, bye_used
 

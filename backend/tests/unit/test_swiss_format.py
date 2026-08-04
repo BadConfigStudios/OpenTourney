@@ -325,7 +325,7 @@ def test_compute_standings_with_no_rounds_ranks_all_entries_at_zero_points():
     assert sorted(row.rank for row in standings) == [1, 2]
 
 
-def test_compute_standings_raises_on_unreported_match():
+def test_compute_standings_method_raises_on_unreported_match():
     e1, e2 = _entry(), _entry()
     round1 = _round(
         1,
