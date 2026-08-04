@@ -27,6 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [personaLabel, setPersonaLabel] = useState<string>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
+    // personas[0] is safe here because ConfigProvider guarantees a non-empty personas array
+    // before this component can mount; that invariant must hold for any future config source.
     return stored && personas.some((p) => p.label === stored) ? stored : personas[0].label;
   });
 

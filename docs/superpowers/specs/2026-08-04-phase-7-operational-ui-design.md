@@ -35,7 +35,9 @@ Phase 7. Corrected here — no PR1 backend work needed.)
 ## Architecture
 
 **App shell**: `main.tsx` → `QueryClientProvider` (existing
-`@tanstack/react-query`) → `ConfigProvider` (loads runtime `config.json`,
+`@tanstack/react-query`; amendment, post-review: implemented inside `App.tsx`
+rather than `main.tsx`, so `App.test.tsx` can render `<App/>` in isolation
+with no external provider ancestor) → `ConfigProvider` (loads runtime `config.json`,
 blocks render until loaded) → `AuthProvider` (persona switcher state) →
 `BrowserRouter` (new dependency: `react-router`) → routed screens, all
 under a shared layout with the persona switcher in a top nav.

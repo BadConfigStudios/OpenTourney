@@ -70,4 +70,29 @@ describe("ConfigProvider", () => {
       expect(screen.getByText(/failed to load app configuration/i)).toBeInTheDocument(),
     );
   });
+
+  it("shows a fatal error if a persona has an empty token (e.g. unset envsubst var)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              personas: [{ label: "Organizer", role: "organizer", token: "" }],
+            }),
+        }),
+      ) as unknown as typeof fetch,
+    );
+
+    render(
+      <ConfigProvider>
+        <Probe />
+      </ConfigProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/failed to load app configuration/i)).toBeInTheDocument(),
+    );
+  });
 });

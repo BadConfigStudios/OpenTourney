@@ -4,7 +4,7 @@
 
 **Goal:** Build the OpenTourney frontend's app shell — runtime persona-token config loading, a persona switcher, an authenticated API client, and route scaffolding — so PR2–4 (setup, pairings/scoring, report screens) can be built as route content only.
 
-**Architecture:** `main.tsx` → `QueryClientProvider` → `ConfigProvider` (fetches `/config.json` at runtime, blocks render until loaded) → `AuthProvider` (holds selected persona, exposes `apiFetch`) → `RouterProvider` (react-router) → `Layout` (persona switcher nav + `<Outlet/>`) → placeholder route elements (real content added in PR2–4).
+**Architecture:** `main.tsx` → `QueryClientProvider` → `ConfigProvider` (fetches `/config.json` at runtime, blocks render until loaded) → `AuthProvider` (holds selected persona, exposes `apiFetch`) → `RouterProvider` (react-router) → `Layout` (persona switcher nav + `<Outlet/>`) → placeholder route elements (real content added in PR2–4). (Amendment, post-review: `QueryClientProvider` actually lives inside `App.tsx`, not `main.tsx`, so `App.test.tsx` can render `<App/>` in isolation with no external provider ancestor.)
 
 **Tech Stack:** React 18, TypeScript, Vite, `@tanstack/react-query` (existing), `react-router` (new), `tailwindcss` v4 + `@tailwindcss/vite` (new), `msw` (new, test-only), Vitest + Testing Library (existing).
 
@@ -663,7 +663,7 @@ export function App() {
 }
 ```
 
-`main.tsx` already wraps `App` in `QueryClientProvider` (required by `AuthProvider`'s `useQueryClient()`) — no change needed beyond Task 1's `index.css` import.
+`main.tsx` already wraps `App` in `QueryClientProvider` (required by `AuthProvider`'s `useQueryClient()`) — no change needed beyond Task 1's `index.css` import. (Amendment, post-review: this line is inaccurate — `QueryClientProvider` is actually inside `App.tsx`, not `main.tsx`, precisely so `App.test.tsx` can render `<App/>` without an external provider ancestor.)
 
 - [ ] **Step 5: Run the test to verify it passes**
 

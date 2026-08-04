@@ -31,9 +31,22 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (!Array.isArray(config.personas) || config.personas.length === 0) {
           throw new Error("config.json has no personas or personas is not an array");
         }
+        const hasInvalidPersona = config.personas.some(
+          (persona) =>
+            typeof persona.label !== "string" ||
+            persona.label.length === 0 ||
+            typeof persona.role !== "string" ||
+            persona.role.length === 0 ||
+            typeof persona.token !== "string" ||
+            persona.token.length === 0,
+        );
+        if (hasInvalidPersona) {
+          throw new Error("config.json has a persona missing a non-empty label, role, or token");
+        }
         if (!cancelled) setState({ status: "ready", config });
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("config.json load failed", error);
         if (!cancelled) setState({ status: "error" });
       });
 
