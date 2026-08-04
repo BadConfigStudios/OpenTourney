@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
-class MatchResult(enum.Enum):
+class MatchResult(str, enum.Enum):
     UNREPORTED = "unreported"
     ENTRY1_WIN = "entry1_win"
     ENTRY2_WIN = "entry2_win"
