@@ -318,6 +318,37 @@
         "title": "PodRead",
         "type": "object"
       },
+      "PodReport": {
+        "properties": {
+          "is_complete": {
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "is_partial": {
+            "title": "Is Partial",
+            "type": "boolean"
+          },
+          "rounds_played": {
+            "title": "Rounds Played",
+            "type": "integer"
+          },
+          "standings": {
+            "items": {
+              "$ref": "#/components/schemas/StandingRowRead"
+            },
+            "title": "Standings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "is_complete",
+          "rounds_played",
+          "is_partial",
+          "standings"
+        ],
+        "title": "PodReport",
+        "type": "object"
+      },
       "PodRoleCreate": {
         "properties": {
           "player_uuid": {
@@ -433,6 +464,30 @@
           "matches"
         ],
         "title": "RoundRead",
+        "type": "object"
+      },
+      "StandingRowRead": {
+        "properties": {
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry_id",
+          "points",
+          "rank"
+        ],
+        "title": "StandingRowRead",
         "type": "object"
       },
       "ValidationError": {
@@ -1259,6 +1314,102 @@
           }
         ],
         "summary": "Update Pod",
+        "tags": [
+          "pods"
+        ]
+      }
+    },
+    "/pods/{pod_id}/complete": {
+      "post": {
+        "operationId": "complete_pod_pods__pod_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pod_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pod Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PodRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Complete Pod",
+        "tags": [
+          "pods"
+        ]
+      }
+    },
+    "/pods/{pod_id}/report": {
+      "get": {
+        "operationId": "get_pod_report_pods__pod_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pod_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pod Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PodReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Pod Report",
         "tags": [
           "pods"
         ]

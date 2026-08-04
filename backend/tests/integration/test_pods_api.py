@@ -352,3 +352,71 @@ def test_non_organizer_cannot_complete_pod(api_client, make_token):
     response = api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(stranger_token))
 
     assert response.status_code == 403
+
+
+def test_report_is_empty_for_pod_with_no_entries(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "is_complete": False,
+        "rounds_played": 0,
+        "is_partial": False,
+        "standings": [],
+    }
+
+
+def test_report_reflects_reported_results(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    _add_entry(api_client, token, pod_id)
+    _add_entry(api_client, token, pod_id)
+    round_ = api_client.post(f"/pods/{pod_id}/rounds", headers=_auth_headers(token)).json()
+    match_id = round_["matches"][0]["id"]
+    api_client.post(
+        f"/matches/{match_id}/result", json={"result": "entry1_win"}, headers=_auth_headers(token)
+    )
+
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_partial"] is False
+    assert body["rounds_played"] == 1
+    assert body["standings"][0]["points"] == 3
+    assert body["standings"][0]["rank"] == 1
+
+
+def test_report_is_partial_when_current_round_has_unreported_matches(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    _add_entry(api_client, token, pod_id)
+    _add_entry(api_client, token, pod_id)
+    api_client.post(f"/pods/{pod_id}/rounds", headers=_auth_headers(token))
+
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_partial"] is True
+    assert body["rounds_played"] == 1
+    # Round 1 itself is excluded from standings (it's the in-progress round being
+    # partial-filtered out) — both entries still appear, at 0 points each, not an
+    # empty list: compute_standings still runs over the (empty) usable_rounds and
+    # all entries, it just has no completed-round results to award points from.
+    assert len(body["standings"]) == 2
+    assert {row["points"] for row in body["standings"]} == {0}
+
+
+def test_report_marks_is_complete_after_pod_completion(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token))
+
+    assert response.json()["is_complete"] is True
