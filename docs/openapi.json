@@ -144,6 +144,95 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "MatchRead": {
+        "properties": {
+          "entry1_id": {
+            "format": "uuid",
+            "title": "Entry1 Id",
+            "type": "string"
+          },
+          "entry2_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry2 Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reported_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported By"
+          },
+          "result": {
+            "$ref": "#/components/schemas/MatchResult"
+          },
+          "round_id": {
+            "format": "uuid",
+            "title": "Round Id",
+            "type": "string"
+          },
+          "table_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Number"
+          },
+          "witnessed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Witnessed By"
+          }
+        },
+        "required": [
+          "id",
+          "round_id",
+          "entry1_id",
+          "entry2_id",
+          "result",
+          "reported_by",
+          "witnessed_by",
+          "table_number"
+        ],
+        "title": "MatchRead",
+        "type": "object"
+      },
+      "MatchResult": {
+        "enum": [
+          "unreported",
+          "entry1_win",
+          "entry2_win",
+          "tie"
+        ],
+        "title": "MatchResult",
+        "type": "string"
+      },
       "PodCreate": {
         "properties": {
           "event_id": {
@@ -293,6 +382,39 @@
           "game_slug"
         ],
         "title": "PodUpdate",
+        "type": "object"
+      },
+      "RoundRead": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/MatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "pod_id": {
+            "format": "uuid",
+            "title": "Pod Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "pod_id",
+          "number",
+          "matches"
+        ],
+        "title": "RoundRead",
         "type": "object"
       },
       "ValidationError": {
@@ -1222,6 +1344,104 @@
         "summary": "Revoke Pod Role",
         "tags": [
           "pod_roles"
+        ]
+      }
+    },
+    "/pods/{pod_id}/rounds": {
+      "get": {
+        "operationId": "list_rounds_pods__pod_id__rounds_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pod_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pod Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoundRead"
+                  },
+                  "title": "Response List Rounds Pods  Pod Id  Rounds Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Rounds",
+        "tags": [
+          "rounds"
+        ]
+      },
+      "post": {
+        "operationId": "generate_round_pods__pod_id__rounds_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pod_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pod Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generate Round",
+        "tags": [
+          "rounds"
         ]
       }
     }
