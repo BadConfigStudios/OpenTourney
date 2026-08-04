@@ -34,6 +34,8 @@ def report_match_result(
 ) -> Match:
     match = _get_match_or_404(db, match_id)
     round_ = db.get(Round, match.round_id)
+    if round_ is None:
+        raise HTTPException(status_code=404, detail="round not found")
     _require_pod_staff(db, identity, round_.pod_id)
 
     if match.entry2_id is None:

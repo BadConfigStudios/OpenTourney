@@ -100,6 +100,22 @@ def test_plain_user_role_cannot_report_match_result(api_client, make_token):
     assert response.status_code == 403
 
 
+def test_reporting_result_again_overwrites_previous_result(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    _, match_id = _pod_with_one_match(api_client, token)
+
+    api_client.post(
+        f"/matches/{match_id}/result", json={"result": "entry1_win"}, headers=_auth_headers(token)
+    )
+
+    response = api_client.post(
+        f"/matches/{match_id}/result", json={"result": "entry2_win"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == "entry2_win"
+
+
 def test_reporting_unreported_as_result_is_rejected(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     _, match_id = _pod_with_one_match(api_client, token)
