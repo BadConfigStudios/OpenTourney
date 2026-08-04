@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.auth.dependencies import (
     get_current_identity,
     get_jwks_provider,
+    pod_staff_allowed,
     require_event_organizer,
     require_organizer_claim,
     require_pod_access,
@@ -17,7 +18,7 @@ from app.auth.identity import Identity
 from app.config import get_settings
 from app.db import get_db_session
 from app.models import Event, Pod
-from app.models.rbac import EventOrganizer, PodRole
+from app.models.rbac import EventOrganizer, PodRole, PodRoleName
 from tests.support.fake_jwks import FakeUnreachableJWKSProvider
 
 
@@ -319,3 +320,70 @@ def test_visible_event_ids_returns_empty_set_when_no_roles(db_session):
     result = visible_event_ids(db_session, identity)
 
     assert result == set()
+
+
+def test_pod_staff_allowed_true_for_event_organizer(db_session):
+    event = Event(date=date(2026, 9, 1))
+    db_session.add(event)
+    db_session.flush()
+    pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
+    db_session.add(pod)
+    db_session.flush()
+    player_uuid = uuid.uuid4()
+    db_session.add(
+        EventOrganizer(event_id=event.id, player_uuid=player_uuid, source_system="club-checkin")
+    )
+    db_session.commit()
+    identity = Identity(player_uuid=player_uuid, source_system="club-checkin", has_organizer_claim=False)
+
+    assert pod_staff_allowed(db_session, identity, pod.id) is True
+
+
+def test_pod_staff_allowed_true_for_scorekeeper(db_session):
+    event = Event(date=date(2026, 9, 1))
+    db_session.add(event)
+    db_session.flush()
+    pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
+    db_session.add(pod)
+    db_session.flush()
+    player_uuid = uuid.uuid4()
+    db_session.add(
+        PodRole(
+            pod_id=pod.id,
+            player_uuid=player_uuid,
+            source_system="club-checkin",
+            role=PodRoleName.SCOREKEEPER,
+        )
+    )
+    db_session.commit()
+    identity = Identity(player_uuid=player_uuid, source_system="club-checkin", has_organizer_claim=False)
+
+    assert pod_staff_allowed(db_session, identity, pod.id) is True
+
+
+def test_pod_staff_allowed_false_for_plain_user_role(db_session):
+    event = Event(date=date(2026, 9, 1))
+    db_session.add(event)
+    db_session.flush()
+    pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
+    db_session.add(pod)
+    db_session.flush()
+    player_uuid = uuid.uuid4()
+    db_session.add(
+        PodRole(
+            pod_id=pod.id,
+            player_uuid=player_uuid,
+            source_system="club-checkin",
+            role=PodRoleName.USER,
+        )
+    )
+    db_session.commit()
+    identity = Identity(player_uuid=player_uuid, source_system="club-checkin", has_organizer_claim=False)
+
+    assert pod_staff_allowed(db_session, identity, pod.id) is False
+
+
+def test_pod_staff_allowed_false_for_nonexistent_pod(db_session):
+    identity = Identity(player_uuid=uuid.uuid4(), source_system="club-checkin", has_organizer_claim=False)
+
+    assert pod_staff_allowed(db_session, identity, uuid.uuid4()) is False

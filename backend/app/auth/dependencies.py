@@ -11,7 +11,7 @@ from app.config import Settings, get_settings
 from app.db import get_db_session
 from app.models import Event
 from app.models.pod import Pod
-from app.models.rbac import EventOrganizer, PodRole
+from app.models.rbac import EventOrganizer, PodRole, PodRoleName
 
 _bearer_scheme = HTTPBearer()
 
@@ -121,6 +121,25 @@ def pod_access_allowed(db: Session, identity: Identity, pod_id: uuid.UUID) -> bo
         return False
     return event_organizer_exists(db, identity, pod.event_id) or pod_role_exists(
         db, identity, pod_id
+    )
+
+
+def pod_staff_allowed(db: Session, identity: Identity, pod_id: uuid.UUID) -> bool:
+    pod = db.get(Pod, pod_id)
+    if pod is None:
+        return False
+    if event_organizer_exists(db, identity, pod.event_id):
+        return True
+    return (
+        db.query(PodRole)
+        .filter_by(
+            pod_id=pod_id,
+            player_uuid=identity.player_uuid,
+            source_system=identity.source_system,
+            role=PodRoleName.SCOREKEEPER,
+        )
+        .first()
+        is not None
     )
 
 
