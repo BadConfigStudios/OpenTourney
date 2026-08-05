@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import { getEvent } from "../api/events";
-import { createPod, listPodsForEvent, type PodRead } from "../api/pods";
+import { createPod, listPodsForEvent } from "../api/pods";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { EntryRoster } from "./EntryRoster";
@@ -22,9 +22,7 @@ export function EventDetail() {
 
   const createPodMutation = useMutation({
     mutationFn: () => createPod(apiFetch, eventId),
-    onSuccess: (newPod) => {
-      queryClient.setQueryData<PodRead[]>(["pods", eventId], (old) => [...(old ?? []), newPod]);
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", eventId] }),
   });
 
   const pod = podsQuery.data?.[0];

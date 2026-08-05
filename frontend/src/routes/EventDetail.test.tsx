@@ -32,12 +32,17 @@ describe("EventDetail", () => {
   });
 
   it("creates a pod with the default format/game slugs and then shows the roster", async () => {
+    // Stateful handler: the component invalidates and refetches GET /pods
+    // after the mutation, so a static handler would mask a broken create by
+    // just re-serving the original (empty) list.
+    let pods: (typeof POD)[] = [];
     server.use(
       http.get("/events/event-1", () => HttpResponse.json(EVENT)),
-      http.get("/pods", () => HttpResponse.json([])),
+      http.get("/pods", () => HttpResponse.json(pods)),
       http.post("/pods", async ({ request }) => {
         const body = await request.json();
         expect(body).toEqual({ event_id: "event-1", format_slug: "swiss", game_slug: "generic" });
+        pods = [POD];
         return HttpResponse.json(POD, { status: 201 });
       }),
       http.get("/entries", () => HttpResponse.json([])),
