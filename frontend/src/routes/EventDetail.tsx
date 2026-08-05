@@ -53,6 +53,10 @@ export function EventDetail() {
             <Link to={`/pods/${pod.id}/pairings`} className="text-blue-600 underline">
               View Pairings
             </Link>
+            {" · "}
+            <Link to={`/pods/${pod.id}/report`} className="text-blue-600 underline">
+              View Report
+            </Link>
           </p>
           <EntryRoster podId={pod.id} />
         </>
