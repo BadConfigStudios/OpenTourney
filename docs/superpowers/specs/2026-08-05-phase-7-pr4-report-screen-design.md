@@ -55,12 +55,15 @@ noted in DEVELOPMENT.md as a known limitation.
   own URL (falls through to Vite's SPA handling) — otherwise let the
   proxy through. The `/pods` bypass's existing `/pairings`-specific regex
   check is removed in favor of this generic check.
-- **`frontend/src/api/request.ts`**: `jsonInit` and any GET call path in
-  `apiRequest`/callers explicitly set `Accept: application/json` — today
-  no `Accept` header is sent (fetch defaults to `*/*`, which the `map`'s
-  `text/html` regex correctly does not match, but making it explicit
-  removes ambiguity and documents the contract other API consumers should
-  follow).
+- **`frontend/src/auth/AuthContext.tsx`**: `apiFetch` (the single choke
+  point every API call already flows through, since it attaches the
+  `Authorization` header) also sets `Accept: application/json` in its
+  headers merge — today no `Accept` header is sent (fetch defaults to
+  `*/*`, which the `map`'s `text/html` regex correctly does not match,
+  but making it explicit removes ambiguity and documents the contract
+  other API consumers should follow). One-line change, one call site,
+  applies to every request uniformly — no per-module edits to
+  `request.ts` or its callers needed.
 - **`DEVELOPMENT.md`**: replace the "Known limitation" paragraph
   (`/events/:eventId` and `/pods/:podId/report` colliding) with a short
   description of the Accept-header dispatch mechanism, including its one
@@ -103,7 +106,8 @@ the real enforcement point.
 ## Testing (NFR1)
 
 - **Unit**: no new business logic beyond the `Accept` header addition to
-  `request.ts` — existing unit tests there updated to assert the header.
+  `AuthContext.tsx`'s `apiFetch` — existing `AuthContext.test.tsx` updated
+  to assert the header is sent alongside `Authorization`.
 - **Component** (`msw`): report screen against mocked `GET
   /pods/{id}/report` + entries — cases: complete, partial, in-progress
   (neither complete nor partial), empty-pod (no rounds played). Complete
