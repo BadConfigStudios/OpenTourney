@@ -14,6 +14,14 @@ const ASH = {
   metadata: { display_name: "Ash" },
 };
 
+const MISTY = {
+  id: "e2",
+  pod_id: "pod-1",
+  player_uuid: "u2",
+  source_system: "opentourney-ui",
+  metadata: { display_name: "Misty" },
+};
+
 describe("EntryRoster", () => {
   beforeEach(() => localStorage.clear());
 
@@ -64,7 +72,7 @@ describe("EntryRoster", () => {
     renderWithProviders(<EntryRoster podId="pod-1" />);
     await screen.findByText("Ash");
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Ash" }));
     fireEvent.change(screen.getByLabelText("Edit name for Ash"), { target: { value: "Misty" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -84,7 +92,7 @@ describe("EntryRoster", () => {
     renderWithProviders(<EntryRoster podId="pod-1" />);
     await screen.findByText("Ash");
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Ash" }));
 
     await waitFor(() => expect(screen.queryByText("Ash")).not.toBeInTheDocument());
   });
@@ -95,9 +103,55 @@ describe("EntryRoster", () => {
     renderWithProviders(<EntryRoster podId="pod-1" />, { personaLabel: "Player" });
 
     await screen.findByText("Ash");
-    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit Ash" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete Ash" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Display name")).not.toBeInTheDocument();
+  });
+
+  it("disambiguates Edit/Delete buttons by entry name across multiple rows", async () => {
+    server.use(http.get("/entries", () => HttpResponse.json([ASH, MISTY])));
+
+    renderWithProviders(<EntryRoster podId="pod-1" />);
+    await screen.findByText("Ash");
+    await screen.findByText("Misty");
+
+    const editAsh = screen.getByRole("button", { name: "Edit Ash" });
+    const editMisty = screen.getByRole("button", { name: "Edit Misty" });
+    const deleteAsh = screen.getByRole("button", { name: "Delete Ash" });
+    const deleteMisty = screen.getByRole("button", { name: "Delete Misty" });
+    expect(editAsh).toBeInTheDocument();
+    expect(editMisty).toBeInTheDocument();
+    expect(deleteAsh).toBeInTheDocument();
+    expect(deleteMisty).toBeInTheDocument();
+
+    fireEvent.click(editAsh);
+    expect(screen.getByLabelText("Edit name for Ash")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Edit name for Misty")).not.toBeInTheDocument();
+  });
+
+  it("clears a stale mutation error once a different action is attempted", async () => {
+    let entries = [ASH];
+    server.use(
+      http.get("/entries", () => HttpResponse.json(entries)),
+      http.post("/entries", () => HttpResponse.json({ detail: "add failed" }, { status: 500 })),
+      http.delete("/entries/e1", () => {
+        entries = [];
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" />);
+    await screen.findByText("Ash");
+
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Brock" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Entry" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("add failed");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Ash" }));
+
+    await waitFor(() => expect(screen.queryByText("Ash")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("hides the edit row if the persona switches to non-Organizer mid-edit", async () => {
@@ -117,7 +171,7 @@ describe("EntryRoster", () => {
     );
 
     await screen.findByText("Ash");
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Ash" }));
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     expect(screen.getByLabelText("Edit name for Ash")).toBeInTheDocument();
 

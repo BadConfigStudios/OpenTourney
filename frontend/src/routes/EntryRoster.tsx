@@ -54,6 +54,8 @@ export function EntryRoster({ podId }: { podId: string }) {
                 />
                 <button
                   onClick={() => {
+                    createMutation.reset();
+                    deleteMutation.reset();
                     updateMutation.mutate({ entryId: entry.id, displayName: editingName });
                     setEditingId(null);
                   }}
@@ -68,6 +70,7 @@ export function EntryRoster({ podId }: { podId: string }) {
                 {isOrganizer && (
                   <span className="flex gap-2">
                     <button
+                      aria-label={`Edit ${entry.metadata.display_name ?? entry.id}`}
                       onClick={() => {
                         setEditingId(entry.id);
                         setEditingName(entry.metadata.display_name ?? "");
@@ -75,7 +78,16 @@ export function EntryRoster({ podId }: { podId: string }) {
                     >
                       Edit
                     </button>
-                    <button onClick={() => deleteMutation.mutate(entry.id)}>Delete</button>
+                    <button
+                      aria-label={`Delete ${entry.metadata.display_name ?? entry.id}`}
+                      onClick={() => {
+                        createMutation.reset();
+                        updateMutation.reset();
+                        deleteMutation.mutate(entry.id);
+                      }}
+                    >
+                      Delete
+                    </button>
                   </span>
                 )}
               </li>
@@ -87,6 +99,8 @@ export function EntryRoster({ podId }: { podId: string }) {
         <form
           onSubmit={(event) => {
             event.preventDefault();
+            updateMutation.reset();
+            deleteMutation.reset();
             createMutation.mutate(newName);
             setNewName("");
           }}
