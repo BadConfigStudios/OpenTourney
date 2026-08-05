@@ -81,4 +81,19 @@ describe("EventDetail", () => {
     await screen.findByText("This event has no pod yet.");
     expect(screen.queryByRole("button", { name: "Create Pod" })).not.toBeInTheDocument();
   });
+
+  it("links to the pairings screen once a pod exists", async () => {
+    server.use(
+      http.get("/events/event-1", () => HttpResponse.json(EVENT)),
+      http.get("/pods", () => HttpResponse.json([POD])),
+      http.get("/entries", () => HttpResponse.json([])),
+    );
+
+    renderDetail();
+
+    expect(await screen.findByRole("link", { name: "View Pairings" })).toHaveAttribute(
+      "href",
+      "/pods/pod-1/pairings",
+    );
+  });
 });
