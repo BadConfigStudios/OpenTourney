@@ -47,6 +47,7 @@ def report_match_result(
 
     reporter = f"{identity.source_system}:{identity.player_uuid}"
     match.result = payload.result
+    match.method = payload.method
     match.reported_by = reporter
     match.witnessed_by = reporter
     db.commit()
