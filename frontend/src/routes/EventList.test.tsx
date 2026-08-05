@@ -22,6 +22,8 @@ describe("EventList", () => {
 
     expect(await screen.findByRole("link", { name: "2026-08-01" })).toHaveAttribute("href", "/events/1");
     expect(screen.getByRole("link", { name: "2026-09-01" })).toHaveAttribute("href", "/events/2");
+    // Default persona (personas[0] in public/config.json) is Organizer.
+    expect(screen.getByRole("link", { name: "New Event" })).toHaveAttribute("href", "/events/new");
   });
 
   it("shows New Event only for the Organizer persona", async () => {
