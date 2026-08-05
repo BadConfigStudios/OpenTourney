@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useParams } from "react-router";
 import { listEntries, type EntryRead } from "../api/entries";
 import { reportMatchResult } from "../api/matches";
-import { fetchRounds } from "../api/rounds";
+import { fetchRounds, generateRound } from "../api/rounds";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
 
@@ -38,6 +38,18 @@ export function Pairings() {
   const rounds = roundsQuery.data ?? [];
   const latestRound = rounds[rounds.length - 1];
 
+  const isOrganizer = currentPersona.role === "organizer";
+  const latestRoundHasUnreportedMatch =
+    latestRound?.matches.some((match) => match.entry2_id !== null && match.result === "unreported") ?? false;
+
+  const generateMutation = useMutation({
+    mutationFn: () => generateRound(apiFetch, podId),
+    onSuccess: (newRound) => {
+      queryClient.invalidateQueries({ queryKey: ["rounds", podId] });
+      setSelectedRoundNumber(newRound.number);
+    },
+  });
+
   const [selectedRoundNumber, setSelectedRoundNumber] = useState<number | null>(null);
   const effectiveRoundNumber = selectedRoundNumber ?? latestRound?.number ?? null;
   const selectedRound = rounds.find((round) => round.number === effectiveRoundNumber);
@@ -46,7 +58,24 @@ export function Pairings() {
   return (
     <div>
       <h2 className="mb-4 text-lg font-semibold">Pairings</h2>
-      <ErrorBanner error={roundsQuery.error ?? entriesQuery.error ?? reportMutation.error} />
+      <ErrorBanner
+        error={roundsQuery.error ?? entriesQuery.error ?? reportMutation.error ?? generateMutation.error}
+      />
+
+      {isOrganizer && (
+        <button
+          onClick={() => generateMutation.mutate()}
+          disabled={roundsQuery.isLoading || (rounds.length > 0 && latestRoundHasUnreportedMatch)}
+          title={
+            latestRoundHasUnreportedMatch
+              ? "All matches in the current round must be reported first"
+              : undefined
+          }
+          className="mb-4 rounded bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+        >
+          Generate Next Round
+        </button>
+      )}
 
       {rounds.length === 0 && !roundsQuery.isLoading && <p>No rounds generated yet.</p>}
 

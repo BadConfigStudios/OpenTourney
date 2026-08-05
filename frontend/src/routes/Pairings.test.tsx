@@ -1,8 +1,9 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
+import type { RoundRead } from "../api/rounds";
 import { Pairings } from "./Pairings";
 
 const ENTRIES = [
@@ -22,7 +23,7 @@ const ENTRIES = [
   },
 ];
 
-const ROUND_1 = {
+const ROUND_1: RoundRead = {
   id: "r1",
   pod_id: "pod-1",
   number: 1,
@@ -41,7 +42,7 @@ const ROUND_1 = {
   ],
 };
 
-export const ROUND_2 = {
+export const ROUND_2: RoundRead = {
   id: "r2",
   pod_id: "pod-1",
   number: 2,
@@ -88,6 +89,14 @@ function renderPairings(personaLabel?: string) {
 }
 
 describe("Pairings", () => {
+  // renderPairings() with no personaLabel relies on the AuthProvider's default
+  // (persona[0], "Organizer") — but persona selection is persisted to
+  // localStorage, so an earlier test's explicit renderPairings("Scorekeeper"/"Player")
+  // would otherwise leak into later default-persona tests. Reset between tests.
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it("shows the latest round's pairings by default, with entry names and table numbers", async () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1, ROUND_2])),
@@ -191,5 +200,47 @@ describe("Pairings", () => {
 
     await screen.findByText(/Table 1: Ash vs Misty/);
     expect(screen.queryByRole("button", { name: "Ash wins" })).not.toBeInTheDocument();
+  });
+
+  it("lets the Organizer generate the next round and auto-selects it", async () => {
+    let rounds: RoundRead[] = [ROUND_1];
+    server.use(
+      http.get("/pods/pod-1/rounds", () => HttpResponse.json(rounds)),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      http.post("/pods/pod-1/rounds", () => {
+        rounds = [...rounds, ROUND_2];
+        return HttpResponse.json(ROUND_2, { status: 201 });
+      }),
+    );
+
+    renderPairings();
+    await screen.findByText(/Table 1: Ash vs Misty/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate Next Round" }));
+
+    expect(await screen.findByText(/Ash — \(bye\)/)).toBeInTheDocument();
+  });
+
+  it("disables Generate Next Round while the latest round has an unreported match", async () => {
+    server.use(
+      http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_3_UNREPORTED])),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderPairings();
+
+    expect(await screen.findByRole("button", { name: "Generate Next Round" })).toBeDisabled();
+  });
+
+  it("hides Generate Next Round for non-Organizer personas", async () => {
+    server.use(
+      http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1])),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderPairings("Scorekeeper");
+
+    await screen.findByText(/Table 1: Ash vs Misty/);
+    expect(screen.queryByRole("button", { name: "Generate Next Round" })).not.toBeInTheDocument();
   });
 });
