@@ -45,7 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       apiFetch: (path: string, init: RequestInit = {}) =>
         fetch(path, {
           ...init,
-          headers: { ...init.headers, Authorization: `Bearer ${currentPersona.token}` },
+          headers: {
+            ...init.headers,
+            Authorization: `Bearer ${currentPersona.token}`,
+            Accept: "application/json",
+          },
         }),
     }),
     [currentPersona, queryClient],
