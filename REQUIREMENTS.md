@@ -90,7 +90,14 @@ but not automatic target adjustment when entries drop.
 
 **Roadmap** (auxiliary/integration work, see README): SAML/LDAP auth,
 embeddable UI module, presentation mode, public meta/analytics API,
-federation/cross-instance analysis.
+federation/cross-instance analysis; ruleset module interface generalization
+— match outcome schema, tiebreak/pairing plugin shape (#41), and a fuller
+multi-reporter match-result model with judge override (#40); mobile
+player-facing pairing view + self-reporting + deconfliction workflow
+(#42-#47); MTG ruleset module, chess deferred pending certification scope
+(#49); self-serve organization onboarding + abuse controls, tiering model
+(#50, #51) — see `ROADMAP.md` for full detail. None of this is scheduled
+to an MVP/phase yet.
 
 ## Build Order
 
