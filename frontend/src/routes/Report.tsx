@@ -1,15 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
-import { listEntries, type EntryRead } from "../api/entries";
+import { displayNameFor, listEntries } from "../api/entries";
 import { completePod } from "../api/pods";
 import { fetchPodReport } from "../api/report";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
-
-function displayNameFor(entries: EntryRead[] | undefined, entryId: string): string {
-  const entry = entries?.find((candidate) => candidate.id === entryId);
-  return entry?.metadata.display_name ?? entryId;
-}
 
 export function Report() {
   const { podId } = useParams<{ podId: string }>();
@@ -30,7 +25,10 @@ export function Report() {
 
   const completeMutation = useMutation({
     mutationFn: () => completePod(apiFetch, podId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["report", podId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["report", podId] });
+      queryClient.invalidateQueries({ queryKey: ["rounds", podId] });
+    },
   });
 
   const report = reportQuery.data;
@@ -77,24 +75,28 @@ export function Report() {
             </button>
           )}
 
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left">
-                <th className="py-1 pr-4">Rank</th>
-                <th className="py-1 pr-4">Entry</th>
-                <th className="py-1">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.standings.map((row) => (
-                <tr key={row.entry_id} className="border-b border-gray-100">
-                  <td className="py-1 pr-4">{row.rank}</td>
-                  <td className="py-1 pr-4">{displayNameFor(entriesQuery.data, row.entry_id)}</td>
-                  <td className="py-1">{row.points}</td>
+          {report.standings.length === 0 ? (
+            <p>No standings yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left">
+                  <th className="py-1 pr-4">Rank</th>
+                  <th className="py-1 pr-4">Entry</th>
+                  <th className="py-1">Points</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.standings.map((row) => (
+                  <tr key={row.entry_id} className="border-b border-gray-100">
+                    <td className="py-1 pr-4">{row.rank}</td>
+                    <td className="py-1 pr-4">{displayNameFor(entriesQuery.data, row.entry_id)}</td>
+                    <td className="py-1">{row.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </>
       )}
     </div>

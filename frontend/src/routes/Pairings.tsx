@@ -1,16 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { listEntries, type EntryRead } from "../api/entries";
+import { displayNameFor, listEntries, type EntryRead } from "../api/entries";
 import { reportMatchResult, type MatchRead } from "../api/matches";
 import { fetchRounds, generateRound } from "../api/rounds";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
-
-function displayNameFor(entries: EntryRead[] | undefined, entryId: string): string {
-  const entry = entries?.find((candidate) => candidate.id === entryId);
-  return entry?.metadata.display_name ?? entryId;
-}
 
 function resultLabelFor(match: MatchRead, entries: EntryRead[] | undefined): string {
   if (match.result === "tie") return "Tie";

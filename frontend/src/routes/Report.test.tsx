@@ -123,4 +123,62 @@ describe("Report", () => {
     await screen.findByText("Ash");
     expect(screen.queryByRole("button", { name: "Complete Pod" })).not.toBeInTheDocument();
   });
+
+  it("hides Complete Pod for the Scorekeeper persona", async () => {
+    server.use(
+      http.get("/pods/pod-1/report", () => HttpResponse.json({ ...COMPLETE_REPORT, is_complete: false })),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderReport("Scorekeeper");
+
+    await screen.findByText("Ash");
+    expect(screen.queryByRole("button", { name: "Complete Pod" })).not.toBeInTheDocument();
+  });
+
+  it("shows a message instead of a table when there are no standings yet", async () => {
+    server.use(
+      http.get("/pods/pod-1/report", () =>
+        HttpResponse.json({ is_complete: false, rounds_played: 0, is_partial: false, standings: [] }),
+      ),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderReport();
+
+    expect(await screen.findByText("No standings yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("row")).toHaveLength(0);
+  });
+
+  it("surfaces an error banner when the report request fails", async () => {
+    server.use(
+      http.get("/pods/pod-1/report", () => HttpResponse.json({ detail: "pod not found" }, { status: 404 })),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderReport();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("pod not found");
+  });
+
+  it("surfaces an error banner when Complete Pod fails with a 409", async () => {
+    server.use(
+      http.get("/pods/pod-1/report", () => HttpResponse.json({ ...COMPLETE_REPORT, is_complete: false })),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      http.post("/pods/pod-1/complete", () =>
+        HttpResponse.json(
+          { detail: "round 2 has an unreported match; cannot complete pod" },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    renderReport();
+    fireEvent.click(await screen.findByRole("button", { name: "Complete Pod" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "round 2 has an unreported match; cannot complete pod",
+    );
+  });
 });

@@ -42,3 +42,8 @@ export function updateEntryDisplayName(
 export function deleteEntry(apiFetch: ApiFetch, entryId: string): Promise<void> {
   return apiRequest(apiFetch, `/entries/${entryId}`, { method: "DELETE" });
 }
+
+export function displayNameFor(entries: EntryRead[] | undefined, entryId: string): string {
+  const entry = entries?.find((candidate) => candidate.id === entryId);
+  return entry?.metadata.display_name ?? entryId;
+}
