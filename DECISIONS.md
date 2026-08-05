@@ -280,3 +280,12 @@ integrate a real IdP (Google or otherwise). Instead:
   `organizer` role claim without either a Workspace custom claim or an
   in-app subject allowlist, for marginal benefit over the switcher given
   the private, disposable-data deployment target.
+
+## 2026-08-04 — Phase 7 PR2: msw for frontend component tests
+
+Component tests for the Event/Pod/Entry setup screens mock HTTP at the
+network layer via `msw` (`frontend/src/test/server.ts`) rather than
+stubbing `AuthContext`'s `apiFetch` internals — tests exercise real
+request/response shapes (URL, method, JSON body) the way the browser
+actually sends them. Confirmed with the owner 2026-08-04, flagged in the
+Phase 7 PR2 design spec's "New dependency" section.
