@@ -45,10 +45,15 @@ noted in DEVELOPMENT.md as a known limitation.
 ### Implementation
 
 - **`frontend/nginx.conf`**: an nginx `map $http_accept $accepts_html { ... }`
-  block (regex match on `text/html`) feeds a variable used inside each of
-  the four prefix `location` blocks: `$accepts_html` true → `try_files $uri
-  /index.html`; false → `proxy_pass http://backend:8000`. (`location`
-  blocks can't branch on headers directly, hence the `map`.) The `/pairings`
+  block (regex match on `text/html`) feeds a variable checked inside each of
+  the four prefix `location` blocks: `if ($accepts_html) { return 418; }`,
+  falling through to `proxy_pass http://backend:8000` otherwise. (`try_files`
+  isn't valid inside an `if` block, and `location` blocks can't branch on
+  headers directly, hence the `map` + `return`.) A server-level
+  `error_page 418 = /index.html;` directive performs an internal redirect
+  to the SPA shell, handled by `location /`'s existing `try_files`; a
+  server-level `add_header Vary Accept always;` ensures HTTP caches don't
+  conflate the SPA and API responses for the same URL. The `/pairings`
   regex `location` is removed.
 - **`frontend/vite.config.ts`**: each prefix's proxy `bypass()` inspects
   `req.headers.accept`; if it contains `text/html`, return the request's
