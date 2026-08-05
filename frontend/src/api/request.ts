@@ -17,7 +17,23 @@ export async function apiRequest<T>(apiFetch: ApiFetch, path: string, init?: Req
     let detail = response.statusText;
     try {
       const body = (await response.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") detail = body.detail;
+      if (typeof body.detail === "string") {
+        detail = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        // FastAPI's built-in RequestValidationError shape: a list of
+        // { loc, msg, type } objects rather than a plain string.
+        const messages = body.detail
+          .map((item) => {
+            if (item && typeof item === "object" && "msg" in item) {
+              const { loc, msg } = item as { loc?: unknown; msg?: unknown };
+              const path = Array.isArray(loc) ? loc.join(".") : undefined;
+              return path ? `${path}: ${String(msg)}` : String(msg);
+            }
+            return undefined;
+          })
+          .filter((message): message is string => Boolean(message));
+        if (messages.length > 0) detail = messages.join("; ");
+      }
     } catch {
       // response body wasn't JSON; fall back to statusText
     }

@@ -37,6 +37,25 @@ describe("apiRequest", () => {
     });
   });
 
+  it("builds a readable message from FastAPI's array-shaped validation detail", async () => {
+    const apiFetch = fetchReturning({
+      ok: false,
+      status: 422,
+      statusText: "Unprocessable Content",
+      json: () =>
+        Promise.resolve({
+          detail: [{ loc: ["body", "date"], msg: "field required", type: "missing" }],
+        }),
+    });
+
+    const error = await apiRequest(apiFetch, "/events", jsonInit("POST", {})).catch((error: unknown) => error);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(422);
+    expect((error as ApiError).message).not.toBe("Unprocessable Content");
+    expect((error as ApiError).message).toContain("field required");
+  });
+
   it("falls back to statusText when the error body isn't JSON", async () => {
     const apiFetch = fetchReturning({
       ok: false,
