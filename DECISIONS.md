@@ -312,3 +312,17 @@ stubbing `AuthContext`'s `apiFetch` internals — tests exercise real
 request/response shapes (URL, method, JSON body) the way the browser
 actually sends them. Confirmed with the owner 2026-08-04, flagged in the
 Phase 7 PR2 design spec's "New dependency" section.
+
+## 2026-08-05 — Phase 7 PR4: Accept-header route dispatch, not /api namespace restructure
+
+`/pods/:podId/report` collides with a real backend endpoint at the
+identical path (`GET /pods/{id}/report`), the second such collision after
+PR2's still-open `/events/:eventId`. Rather than a per-route contained fix
+(PR3's regex carve-out doesn't generalize to a literal-path collision) or
+the larger `/api` namespace restructure, nginx and Vite now dispatch on
+the `Accept` request header instead of path: real browser navigation
+sends `Accept: text/html`, the frontend's own `apiFetch` (`AuthContext.tsx`)
+sends `Accept: application/json`. This replaces PR3's `/pairings` carve-out
+and also retires the `/events/:eventId` collision — one mechanism covers
+all three cases raised across PR2/PR3/PR4. The `/api` restructure remains
+un-adopted. Confirmed with the owner 2026-08-05.

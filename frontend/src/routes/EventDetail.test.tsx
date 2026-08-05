@@ -96,4 +96,19 @@ describe("EventDetail", () => {
       "/pods/pod-1/pairings",
     );
   });
+
+  it("links to the report screen once a pod exists", async () => {
+    server.use(
+      http.get("/events/event-1", () => HttpResponse.json(EVENT)),
+      http.get("/pods", () => HttpResponse.json([POD])),
+      http.get("/entries", () => HttpResponse.json([])),
+    );
+
+    renderDetail();
+
+    expect(await screen.findByRole("link", { name: "View Report" })).toHaveAttribute(
+      "href",
+      "/pods/pod-1/report",
+    );
+  });
 });

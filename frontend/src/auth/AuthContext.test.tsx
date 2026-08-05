@@ -66,4 +66,18 @@ describe("AuthProvider", () => {
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer org-token" }) }),
     );
   });
+
+  it("apiFetch sends an explicit Accept: application/json header", async () => {
+    renderWithProviders();
+    await screen.findByText("Organizer");
+    const fetchSpy = vi.mocked(fetch);
+    fetchSpy.mockClear();
+
+    await act(async () => screen.getByText("fetch").click());
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/events",
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: "application/json" }) }),
+    );
+  });
 });
