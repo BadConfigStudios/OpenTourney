@@ -44,7 +44,7 @@ export function EntryRoster({ podId }: { podId: string }) {
       {entries && entries.length > 0 && (
         <ul className="mb-4 divide-y divide-gray-200">
           {entries.map((entry: EntryRead) =>
-            editingId === entry.id ? (
+            editingId === entry.id && isOrganizer ? (
               <li key={entry.id} className="flex items-center gap-2 py-2">
                 <input
                   aria-label={`Edit name for ${entry.metadata.display_name ?? entry.id}`}

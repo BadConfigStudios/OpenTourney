@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
+import { PersonaSwitcher } from "../auth/PersonaSwitcher";
 import { EntryRoster } from "./EntryRoster";
 
 const ASH = {
@@ -97,5 +98,33 @@ describe("EntryRoster", () => {
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Display name")).not.toBeInTheDocument();
+  });
+
+  it("hides the edit row if the persona switches to non-Organizer mid-edit", async () => {
+    // Regression test: EntryRoster keeps `editingId` as local component state,
+    // which survives a persona switch (switching personas doesn't unmount the
+    // component tree — it only clears the React Query cache). Render a real
+    // PersonaSwitcher alongside EntryRoster, in the same AuthProvider, so we
+    // exercise the actual live persona-change path rather than a fresh mount.
+    server.use(http.get("/entries", () => HttpResponse.json([ASH])));
+
+    renderWithProviders(
+      <>
+        <PersonaSwitcher />
+        <EntryRoster podId="pod-1" />
+      </>,
+      { personaLabel: "Organizer" },
+    );
+
+    await screen.findByText("Ash");
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Edit name for Ash")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("persona"), { target: { value: "Player" } });
+
+    await waitFor(() => expect(screen.getByLabelText("persona")).toHaveValue("Player"));
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Edit name for Ash")).not.toBeInTheDocument();
   });
 });
