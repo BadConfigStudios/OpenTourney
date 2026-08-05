@@ -19,3 +19,7 @@ export function createPod(apiFetch: ApiFetch, eventId: string): Promise<PodRead>
     jsonInit("POST", { event_id: eventId, format_slug: "swiss", game_slug: "generic" }),
   );
 }
+
+export function completePod(apiFetch: ApiFetch, podId: string): Promise<PodRead> {
+  return apiRequest(apiFetch, `/pods/${podId}/complete`, { method: "POST" });
+}

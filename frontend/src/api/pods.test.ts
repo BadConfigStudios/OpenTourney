@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPod, listPodsForEvent } from "./pods";
+import { completePod, createPod, listPodsForEvent } from "./pods";
 
 function fetchReturning(body: unknown, status = 200) {
   return vi.fn().mockResolvedValue({ ok: true, status, json: () => Promise.resolve(body) });
@@ -32,5 +32,20 @@ describe("pods api", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event_id: "e1", format_slug: "swiss", game_slug: "generic" }),
     });
+  });
+
+  it("completePod POSTs /pods/:id/complete", async () => {
+    const apiFetch = fetchReturning({
+      id: "p1",
+      event_id: "e1",
+      format_slug: "swiss",
+      game_slug: "generic",
+      completed_at: "2026-08-05T12:00:00Z",
+    });
+
+    const pod = await completePod(apiFetch, "p1");
+
+    expect(pod.completed_at).toBe("2026-08-05T12:00:00Z");
+    expect(apiFetch).toHaveBeenCalledWith("/pods/p1/complete", { method: "POST" });
   });
 });
