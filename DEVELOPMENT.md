@@ -5,6 +5,18 @@
 See `backend/` and `frontend/` for their own dev setup (`pip install -e ".[dev]"` /
 `npm install`). Both run standalone via their existing (non-prod) `Dockerfile`s.
 
+The frontend's dev server (`npm run dev`) and the prod nginx container both proxy
+`/events`, `/pods`, `/entries`, and `/matches` to the backend (`http://localhost:8000`
+in dev via `vite.config.ts`'s `server.proxy`, `http://backend:8000` in the cluster via
+`nginx.conf`), since the backend mounts its routers directly under those prefixes with
+no `/api` namespace. **Known limitation:** two SPA client-side routes collide with
+backend routes at the exact same path — `/events/:eventId` vs. `GET /events/{id}`, and
+`/pods/:podId/report` vs. `GET /pods/{id}/report`. Normal in-app navigation is
+unaffected (React Router intercepts those clicks and never issues a real request), but
+a hard page refresh on either of those two screens will hit the backend API instead of
+the SPA. A proper fix would namespace the backend under `/api` so no prefix is shared
+with SPA routes; that's out of scope here.
+
 ## Staging deployment
 
 Staging deploys the current feature branch to the cube cluster (k3s on openSUSE
