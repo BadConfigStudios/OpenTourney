@@ -1,9 +1,10 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
 import type { RoundRead } from "../api/rounds";
+import type { MatchResult } from "../api/matches";
 import { Pairings } from "./Pairings";
 
 const ENTRIES = [
@@ -42,7 +43,7 @@ const ROUND_1: RoundRead = {
   ],
 };
 
-export const ROUND_2: RoundRead = {
+const ROUND_2: RoundRead = {
   id: "r2",
   pod_id: "pod-1",
   number: 2,
@@ -61,7 +62,7 @@ export const ROUND_2: RoundRead = {
   ],
 };
 
-const ROUND_3_UNREPORTED = {
+const ROUND_3_UNREPORTED: RoundRead = {
   id: "r3",
   pod_id: "pod-1",
   number: 3,
@@ -92,10 +93,8 @@ describe("Pairings", () => {
   // renderPairings() with no personaLabel relies on the AuthProvider's default
   // (persona[0], "Organizer") — but persona selection is persisted to
   // localStorage, so an earlier test's explicit renderPairings("Scorekeeper"/"Player")
-  // would otherwise leak into later default-persona tests. Reset between tests.
-  afterEach(() => {
-    localStorage.clear();
-  });
+  // would otherwise leak into later default-persona tests. This is now reset
+  // globally between every test in ../test/setup.ts's afterEach.
 
   it("shows the latest round's pairings by default, with entry names and table numbers", async () => {
     server.use(
@@ -122,6 +121,24 @@ describe("Pairings", () => {
     expect(await screen.findByText(/Table 1: Ash vs Misty/)).toBeInTheDocument();
   });
 
+  it("indicates which round is currently selected after clicking a round-history button", async () => {
+    server.use(
+      http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1, ROUND_2])),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderPairings();
+    await screen.findByText(/Ash — \(bye\)/);
+    expect(await screen.findByRole("heading", { name: "Round 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Round 2" })).toHaveAttribute("aria-current", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
+
+    expect(await screen.findByRole("heading", { name: "Round 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Round 1" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Round 2" })).toHaveAttribute("aria-current", "false");
+  });
+
   it("shows a message when no rounds have been generated yet", async () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([])),
@@ -139,7 +156,7 @@ describe("Pairings", () => {
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([{ ...ROUND_3_UNREPORTED, matches }])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
       http.post("/matches/m3/result", async ({ request }) => {
-        const body = (await request.json()) as { result: string };
+        const body = (await request.json()) as { result: MatchResult };
         matches = [{ ...matches[0], result: body.result }];
         return HttpResponse.json(matches[0]);
       }),
@@ -148,7 +165,7 @@ describe("Pairings", () => {
     renderPairings();
     fireEvent.click(await screen.findByRole("button", { name: "Ash wins" }));
 
-    expect(await screen.findByText(/entry1_win/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ash won/)).toBeInTheDocument();
   });
 
   it("shows result buttons for the Scorekeeper persona too", async () => {
@@ -182,7 +199,7 @@ describe("Pairings", () => {
 
     renderPairings();
 
-    expect(await screen.findByText(/entry1_win/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ash won/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ash wins" })).not.toBeInTheDocument();
   });
 
