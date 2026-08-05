@@ -9,13 +9,18 @@ The frontend's dev server (`npm run dev`) and the prod nginx container both prox
 `/events`, `/pods`, `/entries`, and `/matches` to the backend (`http://localhost:8000`
 in dev via `vite.config.ts`'s `server.proxy`, `http://backend:8000` in the cluster via
 `nginx.conf`), since the backend mounts its routers directly under those prefixes with
-no `/api` namespace. **Known limitation:** two SPA client-side routes collide with
-backend routes at the exact same path — `/events/:eventId` vs. `GET /events/{id}`, and
-`/pods/:podId/report` vs. `GET /pods/{id}/report`. Normal in-app navigation is
-unaffected (React Router intercepts those clicks and never issues a real request), but
-a hard page refresh on either of those two screens will hit the backend API instead of
-the SPA. A proper fix would namespace the backend under `/api` so no prefix is shared
-with SPA routes; that's out of scope here.
+no `/api` namespace. Several SPA client-side routes collide with backend routes at the
+exact same path (`/events/:eventId` vs. `GET /events/{id}`, `/pods/:podId/report` vs.
+`GET /pods/{id}/report`) — both nginx.conf and vite.config.ts resolve this by
+dispatching on the `Accept` request header rather than the path: real browser
+navigation (hard refresh, direct link) sends `Accept: text/html,...` and is served the
+SPA, while the frontend's own API calls send `Accept: application/json` (see
+`AuthContext.tsx`'s `apiFetch`) and are proxied to the backend. One edge case: a
+non-browser HTTP client hitting either collided path without an explicit
+`Accept: text/html` (e.g. plain `curl`) is routed to the backend, not the SPA — correct
+behavior for an API consumer, just worth knowing if debugging a "why did I get JSON
+instead of the app" report. A proper `/api` namespace on the backend would remove the
+ambiguity entirely; that's out of scope here.
 
 ## Staging deployment
 
