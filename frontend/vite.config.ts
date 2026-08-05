@@ -4,6 +4,17 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    // Proxy the backend's real path prefixes to the local dev backend
+    // (see backend/Dockerfile.prod / uvicorn, which serves on :8000),
+    // mirroring the prod nginx.conf proxy_pass blocks below.
+    proxy: {
+      "/events": "http://localhost:8000",
+      "/pods": "http://localhost:8000",
+      "/entries": "http://localhost:8000",
+      "/matches": "http://localhost:8000",
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
