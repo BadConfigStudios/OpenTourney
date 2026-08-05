@@ -39,6 +39,33 @@ engine:
 the core pairing/bracket engine — only a new ruleset module implementing
 the three interfaces above.
 
+**Broader config-axis list (added 2026-08-05, owner):** the intent is that
+this platform hosts many different TCGs (and possibly non-TCG games —
+chess someday, who knows), so anything that reasonably varies by
+game/organizer preference should be pluggable/configurable, not
+hardcoded. Beyond the three interfaces above, candidate axes for the
+eventual "ruleset config" shape:
+
+- Tournament type: single-phase vs. multi-phase (e.g. Swiss into single/
+  double-elimination top cut) — already noted as deferred
+  `TournamentFormat` work in REQUIREMENTS.md's MVP1 "Deferred to future
+  MVPs" list.
+- Round length / time limit.
+- Match length: BO1 vs. BO3 vs. BO5 (BO3 already noted as deferred in
+  REQUIREMENTS.md; BO5 not previously captured anywhere).
+- Max players per event/pod.
+- Pods enabled/disabled, and auto-sorting entries into pods by an
+  organizer-chosen variable (e.g. skill tier, age bracket, check-in
+  order) — v1 already constrains to exactly one pod per event (FR8), so
+  multi-pod behavior including auto-sort is new scope, not previously
+  captured.
+
+None of this is designed yet — it's a config-shape brainstorm, not a
+spec. Worth its own `superpowers:brainstorming` pass (probably scoped as
+the natural follow-on to this issue, #41) once ruleset-modularity work is
+actually picked up, likely triggered by the MTG module (#49) validating
+the abstraction against a second real game.
+
 ---
 
 ## 2. Match Result Reporting Model
