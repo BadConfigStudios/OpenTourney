@@ -49,7 +49,7 @@ behind each decision reflected here.
 | FR22 | Operational UI: final report display | BR1 | 7 |
 | FR23 | Sphinx docs content: data-model reference (autodoc), API usage guide, deployment guide — versioned per release | BR2 | 9 |
 | FR24 | Dynamic Swiss round-target: recompute `ceil(log2(active_entries))` from non-dropped entries before each round's pairing, surface the reason to the organizer when it changes; entry drop tracking (`Entry.dropped_at_round`) | BR1 | TBD (post-MVP1) |
-| FR25 | Real Swiss standings tiebreakers: opponent match win % (OMW%) and opponents' opponents' match win % (OOMW%), replacing the UUID-string tiebreak in `SwissFormat` (pairing and final report) | BR1 | 8 |
+| FR25 | Real Swiss standings tiebreakers (OMW%, OOMW%), computed via a pluggable tiebreak-calculation interface rather than hardcoded into `SwissFormat` — so a future tournament format or game module can supply different tiebreak math (e.g. Buchholz, Sonneborn-Berger) without touching pairing/report code; MVP1 ships only the OMW%/OOMW% implementation behind it, replacing the UUID-string tiebreak | BR1, BR4 | 8 |
 | FR26 | Operational UI: persona switcher (pre-minted static-JWKS Organizer/Scorekeeper/Player tokens), not a real login flow — MVP1 auth simplification, see `DECISIONS.md` 2026-08-03 | BR1 | 7 |
 
 ## Non-Functional Requirements (NFR)
@@ -110,5 +110,5 @@ to an MVP/phase yet.
 | 5 | Operational API + RBAC + OIDC + published OpenAPI spec | MVP1 |
 | 6 | Match & tournament reporting (BO1 + provenance + final report) | MVP1 |
 | 7 | Operational UI (setup, pairings, scoring, final report, persona switcher) | MVP1 |
-| 8 | Swiss real tiebreakers (OMW%/OOMW%, replacing the UUID tiebreak in pairing + final report) | MVP1 |
+| 8 | Swiss real tiebreakers (OMW%/OOMW% behind a pluggable tiebreak-calculation interface, replacing the UUID tiebreak in pairing + final report) | MVP1 |
 | 9 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 |
