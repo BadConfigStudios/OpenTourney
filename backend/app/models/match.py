@@ -40,6 +40,7 @@ class Match(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         default=MatchResult.UNREPORTED,
     )
+    method: Mapped[str] = mapped_column(String, nullable=False, default="manual_entry")
     reported_by: Mapped[str | None] = mapped_column(String, nullable=True)
     witnessed_by: Mapped[str | None] = mapped_column(String, nullable=True)
     confirmed_by: Mapped[list] = mapped_column(

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { getEvent } from "../api/events";
 import { createPod, listPodsForEvent } from "../api/pods";
 import { useAuth } from "../auth/AuthContext";
@@ -47,7 +47,16 @@ export function EventDetail() {
         </div>
       )}
 
-      {pod && <EntryRoster podId={pod.id} />}
+      {pod && (
+        <>
+          <p className="mb-4">
+            <Link to={`/pods/${pod.id}/pairings`} className="text-blue-600 underline">
+              View Pairings
+            </Link>
+          </p>
+          <EntryRoster podId={pod.id} />
+        </>
+      )}
     </div>
   );
 }

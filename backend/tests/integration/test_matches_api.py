@@ -50,6 +50,21 @@ def test_organizer_reports_match_result(api_client, make_token):
     assert body["result"] == "entry1_win"
     assert body["reported_by"] == body["witnessed_by"]
     assert body["reported_by"] is not None
+    assert body["method"] == "manual_entry"
+
+
+def test_reporting_result_accepts_explicit_manual_entry_method(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    _, match_id = _pod_with_one_match(api_client, token)
+
+    response = api_client.post(
+        f"/matches/{match_id}/result",
+        json={"result": "entry1_win", "method": "manual_entry"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["method"] == "manual_entry"
 
 
 def test_scorekeeper_can_report_match_result(api_client, make_token):

@@ -168,6 +168,10 @@
             "title": "Id",
             "type": "string"
           },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
           "reported_by": {
             "anyOf": [
               {
@@ -218,7 +222,8 @@
           "result",
           "reported_by",
           "witnessed_by",
-          "table_number"
+          "table_number",
+          "method"
         ],
         "title": "MatchRead",
         "type": "object"
@@ -235,6 +240,12 @@
       },
       "MatchResultUpdate": {
         "properties": {
+          "method": {
+            "const": "manual_entry",
+            "default": "manual_entry",
+            "title": "Method",
+            "type": "string"
+          },
           "result": {
             "enum": [
               "entry1_win",

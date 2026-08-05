@@ -281,6 +281,29 @@ integrate a real IdP (Google or otherwise). Instead:
   in-app subject allowlist, for marginal benefit over the switcher given
   the private, disposable-data deployment target.
 
+## 2026-08-05 — Phase 7 PR3: match `method` field, minimal not full reconciliation model
+
+Match result reporting gets a `method` field (`Literal["manual_entry"]`
+for now) so a future reporting method can be distinguished later without
+another migration. A fuller dual-submission/dispute-reconciliation model
+(player-vs-player conflicting claims in `confirmed_by`, a `status` field
+separate from `result`, per-entry reporter authorization) was proposed
+during design review and rejected for now: it solves a workflow with no
+current UI, no player-submission endpoint, and no FR requiring it.
+Tracked as a future GitHub issue instead of building ahead of need.
+Confirmed with the owner 2026-08-05.
+
+## 2026-08-05 — Phase 7 PR3: Scorekeeper UI gating by persona role, not per-pod self-check
+
+Parent Phase 7 spec assumed `GET /pods/{id}/roles` could be used by a
+Scorekeeper persona to self-check its pod role; that endpoint is actually
+`require_pod_organizer`-gated (403 for Scorekeeper). Rather than add a new
+backend self-check endpoint, PR3's UI gates the result-entry controls by
+persona role alone (`organizer`/`scorekeeper` see them, `player` doesn't)
+— convenience only, same as the rest of the RBAC-gating design; the
+backend's `pod_staff_allowed` check remains the real enforcement.
+Confirmed with the owner 2026-08-05.
+
 ## 2026-08-04 — Phase 7 PR2: msw for frontend component tests
 
 Component tests for the Event/Pod/Entry setup screens mock HTTP at the

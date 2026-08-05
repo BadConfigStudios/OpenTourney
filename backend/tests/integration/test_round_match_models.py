@@ -40,6 +40,19 @@ def test_match_defaults_to_unreported(db_session):
     assert match.confirmed_by == []
 
 
+def test_match_defaults_method_to_manual_entry(db_session):
+    pod, entry1, entry2 = _make_pod_with_two_entries(db_session)
+    round_ = Round(pod_id=pod.id, number=1)
+    db_session.add(round_)
+    db_session.flush()
+
+    match = Match(round_id=round_.id, entry1_id=entry1.id, entry2_id=entry2.id)
+    db_session.add(match)
+    db_session.commit()
+
+    assert match.method == "manual_entry"
+
+
 def test_round_number_unique_per_pod(db_session):
     pod, _entry1, _entry2 = _make_pod_with_two_entries(db_session)
     db_session.add(Round(pod_id=pod.id, number=1))

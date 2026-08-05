@@ -17,7 +17,9 @@ class MatchRead(BaseModel):
     reported_by: str | None
     witnessed_by: str | None
     table_number: int | None
+    method: str
 
 
 class MatchResultUpdate(BaseModel):
     result: Literal[MatchResult.ENTRY1_WIN, MatchResult.ENTRY2_WIN, MatchResult.TIE]
+    method: Literal["manual_entry"] = "manual_entry"
