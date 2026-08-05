@@ -47,7 +47,10 @@ behind each decision reflected here.
 | FR20 | Operational UI: Swiss pairings + seating display | BR1 | 7 |
 | FR21 | Operational UI: BO1 scoring, gated by RBAC role | BR1 | 7 |
 | FR22 | Operational UI: final report display | BR1 | 7 |
-| FR23 | Sphinx docs content: data-model reference (autodoc), API usage guide, deployment guide — versioned per release | BR2 | 8 |
+| FR23 | Sphinx docs content: data-model reference (autodoc), API usage guide, deployment guide — versioned per release | BR2 | 9 |
+| FR24 | Dynamic Swiss round-target: recompute `ceil(log2(active_entries))` from non-dropped entries before each round's pairing, surface the reason to the organizer when it changes; entry drop tracking (`Entry.dropped_at_round`) | BR1 | TBD (post-MVP1) |
+| FR25 | Real Swiss standings tiebreakers: opponent match win % (OMW%) and opponents' opponents' match win % (OOMW%), replacing the UUID-string tiebreak in `SwissFormat` (pairing and final report) | BR1 | 8 |
+| FR26 | Operational UI: persona switcher (pre-minted static-JWKS Organizer/Scorekeeper/Player tokens), not a real login flow — MVP1 auth simplification, see `DECISIONS.md` 2026-08-03 | BR1 | 7 |
 
 ## Non-Functional Requirements (NFR)
 
@@ -58,19 +61,21 @@ behind each decision reflected here.
 | NFR3 | Every phase verified against the real Kubernetes staging environment, not deferred to a final integration phase |
 | NFR4 | OpenTourney owns no accounts or passwords; authentication is always externally asserted |
 | NFR5 | `TournamentFormat` and `GameModule` plugin interfaces stay fully decoupled — neither assumes anything about the other |
+| NFR6 | Published OpenAPI contract carries more than the schema shape: realistic constraints (e.g. field limits, valid enum ranges) and fake/mock example payloads per endpoint, so third-party API consumers (BR2) can integrate and test against the contract without a live instance — good-citizen API publishing, not required for MVP1 completion, tracked for post-MVP1 |
 
 ## MVP Breakdown
 
 ### MVP1 — Core In-Person Swiss Engine (target `v0.1.0`)
 
-Serves BR1–BR4 / FR1–FR23. Phases 1–8.
+Serves BR1–BR4 / FR1–FR23, FR25–FR26. Phases 1–9.
 
 **Acceptance**: An Organizer can authenticate (OIDC), create an in-person
 Event with one Pod (Swiss format, generic game module), add Entries, and
 run the event through the operational UI — Round 1 pairings with seating,
 Scorekeeper/Organizer-entered BO1 results with provenance, subsequent
 rounds generated from standings, through to a final standings/placement
-report — entirely via the published, versioned API, deployed and verified
+report ranked with real tiebreakers (OMW%/OOMW%) — entirely via the
+published, versioned API, deployed and verified
 on the Kubernetes staging environment, with Sphinx docs covering the data
 model, API usage, and deployment.
 
@@ -78,7 +83,10 @@ model, API usage, and deployment.
 architectural non-goals): Pokémon TCG (and other) `GameModule`s,
 single/double-elimination and multi-phase `TournamentFormat`s, BO3,
 self-service player registration, online modality (per-game module:
-username discovery, friending instructions, match setup).
+username discovery, friending instructions, match setup), dynamic Swiss
+round-target recalculation from mid-tournament drops (FR24) — Phase 6
+covers organizer-triggered round generation and manual early completion,
+but not automatic target adjustment when entries drop.
 
 **Roadmap** (auxiliary/integration work, see README): SAML/LDAP auth,
 embeddable UI module, presentation mode, public meta/analytics API,
@@ -94,5 +102,6 @@ federation/cross-instance analysis.
 | 4 | Swiss pairing/round generation + seating | MVP1 |
 | 5 | Operational API + RBAC + OIDC + published OpenAPI spec | MVP1 |
 | 6 | Match & tournament reporting (BO1 + provenance + final report) | MVP1 |
-| 7 | Operational UI (setup, pairings, scoring, final report) | MVP1 |
-| 8 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 |
+| 7 | Operational UI (setup, pairings, scoring, final report, persona switcher) | MVP1 |
+| 8 | Swiss real tiebreakers (OMW%/OOMW%, replacing the UUID tiebreak in pairing + final report) | MVP1 |
+| 9 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 |

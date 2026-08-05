@@ -245,3 +245,38 @@ odd-one-out gets the bye) rather than randomizing internally — any
 randomization is the caller's responsibility (e.g. shuffling `entries`
 before calling), keeping the format itself deterministic and easy to
 test.
+
+## 2026-08-03 — MVP1 auth: pre-minted persona tokens + a UI persona switcher, real SSO deferred
+
+MVP1 will run only on the owner's own private cluster, not public-facing;
+even if it were externally reachable, the owner accepts blowing the data
+away rather than treating it as production. Given that, MVP1 does not
+integrate a real IdP (Google or otherwise). Instead:
+
+- The Phase 5 static-JWKS escape hatch (`OIDC_JWKS_STATIC` +
+  `scripts/mint_test_token.py`), previously documented above as
+  staging-verification-only, becomes MVP1's actual identity mechanism too.
+  A fixed small set of personas (Organizer, Scorekeeper, one or more
+  Players) are pre-minted once (long expiry) via that same script.
+- Phase 7's UI gets a persona switcher (dropdown) instead of a login flow —
+  swaps which pre-minted token the API client attaches as the Bearer
+  header. No `POST /login`-shaped endpoint is added to the backend; the
+  app still only ever *validates* tokens (`NFR4` stays intact — minting
+  happens outside the running app, via the offline script, not inside it).
+- Pre-minted tokens are long-lived credentials (effectively permanent
+  Organizer access) and must not be committed to git or baked into the
+  public JS bundle — Helm-secret-injected at deploy time.
+- Real SSO (Google or otherwise) is explicitly a separate, later
+  initiative (the owner has other plans for it) — swapping it in later is
+  a config change only (`OIDC_ISSUER`/`OIDC_JWKS_URL` pointed at a real
+  IdP), *except* `identity_from_claims` (`app/auth/identity.py`) currently
+  assumes `claims["sub"]` parses as a UUID, which breaks for Google's
+  opaque numeric `sub` — flagged here so it isn't rediscovered from
+  scratch when that work starts.
+- Rejected for MVP1: standing up a real broker (Dex/Keycloak) — real OIDC
+  end-to-end, but a new service to deploy/operate for a milestone that
+  doesn't need multi-user trust boundaries yet. Rejected: pointing
+  directly at Google now — same `sub`-is-not-a-UUID blocker plus no
+  `organizer` role claim without either a Workspace custom claim or an
+  in-app subject allowlist, for marginal benefit over the switcher given
+  the private, disposable-data deployment target.
