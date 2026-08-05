@@ -1,0 +1,101 @@
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it } from "vitest";
+import { server } from "../test/server";
+import { renderWithProviders } from "../test/renderWithProviders";
+import { EntryRoster } from "./EntryRoster";
+
+const ASH = {
+  id: "e1",
+  pod_id: "pod-1",
+  player_uuid: "u1",
+  source_system: "opentourney-ui",
+  metadata: { display_name: "Ash" },
+};
+
+describe("EntryRoster", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("lists entries by display name", async () => {
+    server.use(http.get("/entries", () => HttpResponse.json([ASH])));
+
+    renderWithProviders(<EntryRoster podId="pod-1" />);
+
+    expect(await screen.findByText("Ash")).toBeInTheDocument();
+  });
+
+  it("adds an entry as Organizer", async () => {
+    // Stateful handler: the component invalidates and refetches GET /entries
+    // after the mutation, so a static handler would mask a broken add by
+    // just re-serving the original (empty) list.
+    let entries: (typeof ASH)[] = [];
+    server.use(
+      http.get("/entries", () => HttpResponse.json(entries)),
+      http.post("/entries", async ({ request }) => {
+        const body = (await request.json()) as { metadata: { display_name: string } };
+        const created = { ...ASH, metadata: body.metadata };
+        entries = [created];
+        return HttpResponse.json(created, { status: 201 });
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" />);
+    await screen.findByText("No entries yet.");
+
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ash" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Entry" }));
+
+    expect(await screen.findByText("Ash")).toBeInTheDocument();
+  });
+
+  it("edits an entry's display name", async () => {
+    // Stateful handler for the same reason as the add-entry test above.
+    let current = ASH;
+    server.use(
+      http.get("/entries", () => HttpResponse.json([current])),
+      http.patch("/entries/e1", async ({ request }) => {
+        const body = (await request.json()) as { metadata: { display_name: string } };
+        current = { ...current, metadata: body.metadata };
+        return HttpResponse.json(current);
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" />);
+    await screen.findByText("Ash");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Edit name for Ash"), { target: { value: "Misty" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Misty")).toBeInTheDocument();
+  });
+
+  it("deletes an entry", async () => {
+    let deleted = false;
+    server.use(
+      http.get("/entries", () => HttpResponse.json(deleted ? [] : [ASH])),
+      http.delete("/entries/e1", () => {
+        deleted = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" />);
+    await screen.findByText("Ash");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(screen.queryByText("Ash")).not.toBeInTheDocument());
+  });
+
+  it("hides mutation controls for a non-Organizer persona", async () => {
+    server.use(http.get("/entries", () => HttpResponse.json([ASH])));
+
+    renderWithProviders(<EntryRoster podId="pod-1" />, { personaLabel: "Player" });
+
+    await screen.findByText("Ash");
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Display name")).not.toBeInTheDocument();
+  });
+});
