@@ -342,3 +342,47 @@ def test_compute_standings_method_raises_on_unreported_match():
 
     with pytest.raises(ValueError, match="unreported"):
         SwissFormat().compute_standings([e1, e2], [round1])
+
+
+def test_rank_entries_orders_by_points_then_tiebreak_then_uuid():
+    from app.formats.swiss import _rank_entries
+
+    e_low_points, e_high_tiebreak, e_low_tiebreak, e_tied_a, e_tied_b = (
+        _entry(),
+        _entry(),
+        _entry(),
+        _entry(),
+        _entry(),
+    )
+    standings = {
+        e_low_points.id: 0,
+        e_high_tiebreak.id: 3,
+        e_low_tiebreak.id: 3,
+        e_tied_a.id: 6,
+        e_tied_b.id: 6,
+    }
+    tiebreaks = {
+        e_low_points.id: (0.9, 0.9),
+        e_high_tiebreak.id: (0.7, 0.7),
+        e_low_tiebreak.id: (0.4, 0.4),
+        e_tied_a.id: (0.5, 0.5),
+        e_tied_b.id: (0.5, 0.5),
+    }
+
+    ranked = _rank_entries(
+        [e_low_points, e_high_tiebreak, e_low_tiebreak, e_tied_a, e_tied_b],
+        standings,
+        tiebreaks,
+    )
+
+    # e_tied_a/e_tied_b (6 pts) rank above e_high_tiebreak/e_low_tiebreak
+    # (3 pts) despite a lower tiebreak value -- points always wins first.
+    assert {r.id for r in ranked[:2]} == {e_tied_a.id, e_tied_b.id}
+    # Within the 3-point group, the higher tiebreak value ranks first.
+    assert ranked[2].id == e_high_tiebreak.id
+    assert ranked[3].id == e_low_tiebreak.id
+    # e_low_points is last regardless of its (unused) high tiebreak value.
+    assert ranked[4].id == e_low_points.id
+    # e_tied_a/e_tied_b are tied on both points AND tiebreak -- UUID string
+    # order is the last-resort fallback.
+    assert [r.id for r in ranked[:2]] == sorted([e_tied_a.id, e_tied_b.id], key=str)

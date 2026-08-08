@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.models import Entry, Round
+from app.tiebreak.base import TiebreakStrategy
 
 
 @dataclass(frozen=True)
@@ -18,10 +19,14 @@ class StandingRow:
     entry_id: uuid.UUID
     points: int
     rank: int
+    tiebreakers: tuple[float, ...]
 
 
 class TournamentFormat(ABC):
     slug: str
+
+    def __init__(self, tiebreak: TiebreakStrategy):
+        self.tiebreak = tiebreak
 
     @abstractmethod
     def generate_round(

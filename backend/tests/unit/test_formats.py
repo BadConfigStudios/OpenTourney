@@ -3,6 +3,7 @@ import uuid
 import pytest
 
 from app.formats.base import Pairing, TournamentFormat
+from app.tiebreak.owp_oomw import OwpOomwTiebreak
 
 
 def test_tournament_format_is_abstract():
@@ -31,7 +32,9 @@ def test_concrete_format_implements_generate_round():
         def compute_standings(self, entries, rounds):
             return []
 
-    pairings = StubFormat().generate_round(entries=[], previous_rounds=[])
+    pairings = StubFormat(tiebreak=OwpOomwTiebreak()).generate_round(
+        entries=[], previous_rounds=[]
+    )
 
     assert len(pairings) == 1
     assert pairings[0].entry2_id is None
