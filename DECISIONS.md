@@ -339,12 +339,23 @@ second algorithm "family," not just different constants). Introduced a
 `TiebreakStrategy` interface (`backend/app/tiebreak/`) that receives all
 entries and the full round history — not just one entry's own matches —
 so a future Family B strategy fits the same contract without a breaking
-change. `TournamentFormat` takes the strategy via constructor injection;
-`SwissFormat` defaults to `OwpOomwTiebreak()` (MTG-standard constants).
-Phase 8 ships only the Family A (opponent-average percentage chain)
-implementation; a second family is deferred to #41, triggered by an actual
-second game module needing it, not spread speculatively now. Confirmed
-with the owner 2026-08-05.
+change at the `backend/app/tiebreak/` boundary. `TournamentFormat` takes
+the strategy via constructor injection; `SwissFormat` defaults to
+`OwpOomwTiebreak()` (MTG-standard constants). Phase 8 ships only the
+Family A (opponent-average percentage chain) implementation; a second
+family is deferred to #41, triggered by an actual second game module
+needing it, not spread speculatively now. Confirmed with the owner
+2026-08-05.
+
+**Caveat found in final review (2026-08-08):** the "no breaking change"
+guarantee holds for the backend interface only. `StandingRowRead` carries
+tiebreak values as a bare `list[float]` with no label or strategy
+identifier, and the frontend Report screen hardcodes `tiebreakers[0]`/
+`tiebreakers[1]` as "OMW%"/"OOMW%" column headers. A Family B strategy
+(e.g. a 1-tuple `(cmp,)`) would render correctly on the backend but
+mislabeled and partially blank in the UI. Tracked as issue #57 (a labeled/typed wire contract, e.g.
+`[{label, value, format}, ...]`), needed before a second family ships
+under #41, not before Phase 8 merges.
 
 ## 2026-08-08 — Phase 8: bye-only entries floor OMW%/OOMW% at the floor value, not 0.0
 
