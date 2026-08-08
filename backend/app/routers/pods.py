@@ -177,7 +177,12 @@ def get_pod_report(
         rounds_played=len(all_rounds),
         is_partial=is_partial,
         standings=[
-            StandingRowRead(entry_id=row.entry_id, points=row.points, rank=row.rank)
+            StandingRowRead(
+                entry_id=row.entry_id,
+                points=row.points,
+                rank=row.rank,
+                tiebreakers=list(row.tiebreakers),
+            )
             for row in standings
         ],
     )

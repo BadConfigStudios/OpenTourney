@@ -2,6 +2,8 @@ from collections.abc import Sequence
 
 from app.formats.base import Pairing, StandingRow, TournamentFormat
 from app.models import Entry, MatchResult, Round
+from app.tiebreak.base import TiebreakStrategy
+from app.tiebreak.owp_oomw import OwpOomwTiebreak
 
 WIN_POINTS = 3
 TIE_POINTS = 1
@@ -11,6 +13,14 @@ LOSS_POINTS = 0
 class SwissFormat(TournamentFormat):
     slug = "swiss"
 
+    def __init__(self, tiebreak: TiebreakStrategy | None = None):
+        super().__init__(
+            tiebreak
+            or OwpOomwTiebreak(
+                win_points=WIN_POINTS, tie_points=TIE_POINTS, loss_points=LOSS_POINTS
+            )
+        )
+
     def generate_round(
         self, entries: Sequence[Entry], previous_rounds: Sequence[Round]
     ) -> list[Pairing]:
@@ -18,8 +28,9 @@ class SwissFormat(TournamentFormat):
             return _pair_round_one(entries)
 
         standings, bye_used = _compute_standings(entries, previous_rounds)
+        tiebreaks = self.tiebreak.compute(entries, previous_rounds)
         already_paired = _paired_history(previous_rounds)
-        ranked = _rank_entries(entries, standings)
+        ranked = _rank_entries(entries, standings, tiebreaks)
 
         bye_entry = None
         if len(ranked) % 2 == 1:
@@ -36,9 +47,15 @@ class SwissFormat(TournamentFormat):
         self, entries: Sequence[Entry], rounds: Sequence[Round]
     ) -> list[StandingRow]:
         standings, _ = _compute_standings(entries, rounds)
-        ranked = _rank_entries(entries, standings)
+        tiebreaks = self.tiebreak.compute(entries, rounds)
+        ranked = _rank_entries(entries, standings, tiebreaks)
         return [
-            StandingRow(entry_id=entry.id, points=standings.get(entry.id, 0), rank=i + 1)
+            StandingRow(
+                entry_id=entry.id,
+                points=standings.get(entry.id, 0),
+                rank=i + 1,
+                tiebreakers=tiebreaks.get(entry.id, ()),
+            )
             for i, entry in enumerate(ranked)
         ]
 
@@ -81,8 +98,15 @@ def _paired_history(previous_rounds: Sequence[Round]) -> set:
     return paired
 
 
-def _rank_entries(entries: Sequence[Entry], standings: dict) -> list:
-    return sorted(entries, key=lambda entry: (-standings.get(entry.id, 0), str(entry.id)))
+def _rank_entries(entries: Sequence[Entry], standings: dict, tiebreaks: dict) -> list:
+    return sorted(
+        entries,
+        key=lambda entry: (
+            -standings.get(entry.id, 0),
+            tuple(-v for v in tiebreaks.get(entry.id, ())),
+            str(entry.id),
+        ),
+    )
 
 
 def _select_bye_entry(ranked: list, bye_used: set):

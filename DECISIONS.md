@@ -326,3 +326,44 @@ sends `Accept: application/json`. This replaces PR3's `/pairings` carve-out
 and also retires the `/events/:eventId` collision — one mechanism covers
 all three cases raised across PR2/PR3/PR4. The `/api` restructure remains
 un-adopted. Confirmed with the owner 2026-08-05.
+
+## 2026-08-05 — Phase 8: pluggable `TiebreakStrategy` interface, Family A only this phase
+
+`SwissFormat`'s standings/pairing tiebreak was a UUID-string comparison
+stopgap since Phase 6. Replacing it with real Swiss tiebreakers (OMW%/OOMW%)
+via a hardcoded formula inside `swiss.py` would work for MVP1 but block the
+roadmap's ruleset-module generalization (issue #41) once a second game
+module needs a structurally different tiebreak (e.g. Flesh and Blood's
+round-history-based CMP, identified in `docs/tcg-ruleset-research.md` as a
+second algorithm "family," not just different constants). Introduced a
+`TiebreakStrategy` interface (`backend/app/tiebreak/`) that receives all
+entries and the full round history — not just one entry's own matches —
+so a future Family B strategy fits the same contract without a breaking
+change at the `backend/app/tiebreak/` boundary. `TournamentFormat` takes
+the strategy via constructor injection; `SwissFormat` defaults to
+`OwpOomwTiebreak()` (MTG-standard constants). Phase 8 ships only the
+Family A (opponent-average percentage chain) implementation; a second
+family is deferred to #41, triggered by an actual second game module
+needing it, not spread speculatively now. Confirmed with the owner
+2026-08-05.
+
+**Caveat found in final review (2026-08-08):** the "no breaking change"
+guarantee holds for the backend interface only. `StandingRowRead` carries
+tiebreak values as a bare `list[float]` with no label or strategy
+identifier, and the frontend Report screen hardcodes `tiebreakers[0]`/
+`tiebreakers[1]` as "OMW%"/"OOMW%" column headers. A Family B strategy
+(e.g. a 1-tuple `(cmp,)`) would render correctly on the backend but
+mislabeled and partially blank in the UI. Tracked as issue #57 (a labeled/typed wire contract, e.g.
+`[{label, value, format}, ...]`), needed before a second family ships
+under #41, not before Phase 8 merges.
+
+## 2026-08-08 — Phase 8: bye-only entries floor OMW%/OOMW% at the floor value, not 0.0
+
+`OwpOomwTiebreak`'s opponent-average (`_average`) originally returned `0.0`
+for an entry with zero real opponents faced (e.g. a round-1 bye recipient
+before their first real match) — this inverted the "a bye is a win" intent,
+ranking bye recipients below every equal-point entry with even a very weak
+real opponent. The owner confirmed the fix: an empty opponent list floors
+to `self.floor` (0.33 under MVP1's defaults), the same floor already
+applied to individual opponents' own-MWP values elsewhere in the formula,
+rather than asserting a raw 0.0. Confirmed with the owner 2026-08-08.

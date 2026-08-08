@@ -4,6 +4,7 @@ export interface StandingRow {
   entry_id: string;
   points: number;
   rank: number;
+  tiebreakers: number[];
 }
 
 export interface PodReport {

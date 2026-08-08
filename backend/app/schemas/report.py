@@ -7,6 +7,7 @@ class StandingRowRead(BaseModel):
     entry_id: uuid.UUID
     points: int
     rank: int
+    tiebreakers: list[float]
 
 
 class PodReport(BaseModel):
