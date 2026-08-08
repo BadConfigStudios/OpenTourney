@@ -11,7 +11,7 @@ describe("report api", () => {
       is_complete: false,
       rounds_played: 2,
       is_partial: true,
-      standings: [{ entry_id: "e1", points: 6, rank: 1 }],
+      standings: [{ entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] }],
     });
 
     const report = await fetchPodReport(apiFetch, "pod-1");
@@ -20,7 +20,7 @@ describe("report api", () => {
       is_complete: false,
       rounds_played: 2,
       is_partial: true,
-      standings: [{ entry_id: "e1", points: 6, rank: 1 }],
+      standings: [{ entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] }],
     });
     expect(apiFetch).toHaveBeenCalledWith("/pods/pod-1/report", undefined);
   });

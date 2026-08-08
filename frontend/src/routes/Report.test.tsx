@@ -15,8 +15,8 @@ const COMPLETE_REPORT = {
   rounds_played: 2,
   is_partial: false,
   standings: [
-    { entry_id: "e1", points: 6, rank: 1 },
-    { entry_id: "e2", points: 3, rank: 2 },
+    { entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] },
+    { entry_id: "e2", points: 3, rank: 2, tiebreakers: [0.415, 0.4] },
   ],
 };
 
@@ -45,6 +45,23 @@ describe("Report", () => {
     expect(rows[2]).toHaveTextContent("2");
     expect(rows[2]).toHaveTextContent("Misty");
     expect(rows[2]).toHaveTextContent("3");
+  });
+
+  it("shows OMW%/OOMW% columns", async () => {
+    server.use(
+      http.get("/pods/pod-1/report", () => HttpResponse.json(COMPLETE_REPORT)),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderReport();
+
+    const rows = await screen.findAllByRole("row");
+    expect(rows[0]).toHaveTextContent("OMW%");
+    expect(rows[0]).toHaveTextContent("OOMW%");
+    expect(rows[1]).toHaveTextContent("75.0%");
+    expect(rows[1]).toHaveTextContent("50.0%");
+    expect(rows[2]).toHaveTextContent("41.5%");
+    expect(rows[2]).toHaveTextContent("40.0%");
   });
 
   it("shows a partial-round banner when is_partial is true", async () => {
