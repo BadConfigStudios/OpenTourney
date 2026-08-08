@@ -491,12 +491,20 @@
           "rank": {
             "title": "Rank",
             "type": "integer"
+          },
+          "tiebreakers": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Tiebreakers",
+            "type": "array"
           }
         },
         "required": [
           "entry_id",
           "points",
-          "rank"
+          "rank",
+          "tiebreakers"
         ],
         "title": "StandingRowRead",
         "type": "object"
