@@ -14,7 +14,12 @@ class SwissFormat(TournamentFormat):
     slug = "swiss"
 
     def __init__(self, tiebreak: TiebreakStrategy | None = None):
-        super().__init__(tiebreak or OwpOomwTiebreak())
+        super().__init__(
+            tiebreak
+            or OwpOomwTiebreak(
+                win_points=WIN_POINTS, tie_points=TIE_POINTS, loss_points=LOSS_POINTS
+            )
+        )
 
     def generate_round(
         self, entries: Sequence[Entry], previous_rounds: Sequence[Round]

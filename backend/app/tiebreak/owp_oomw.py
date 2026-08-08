@@ -44,10 +44,9 @@ class OwpOomwTiebreak(TiebreakStrategy):
             return 0.0
         return max(points / (self.win_points * rounds_played), self.floor)
 
-    @staticmethod
-    def _average(values: dict[uuid.UUID, float], opponent_ids: list[uuid.UUID]) -> float:
+    def _average(self, values: dict[uuid.UUID, float], opponent_ids: list[uuid.UUID]) -> float:
         if not opponent_ids:
-            return 0.0
+            return self.floor
         return sum(values[opponent_id] for opponent_id in opponent_ids) / len(opponent_ids)
 
     def _points_and_rounds_played(

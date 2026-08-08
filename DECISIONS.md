@@ -345,3 +345,14 @@ Phase 8 ships only the Family A (opponent-average percentage chain)
 implementation; a second family is deferred to #41, triggered by an actual
 second game module needing it, not spread speculatively now. Confirmed
 with the owner 2026-08-05.
+
+## 2026-08-08 — Phase 8: bye-only entries floor OMW%/OOMW% at the floor value, not 0.0
+
+`OwpOomwTiebreak`'s opponent-average (`_average`) originally returned `0.0`
+for an entry with zero real opponents faced (e.g. a round-1 bye recipient
+before their first real match) — this inverted the "a bye is a win" intent,
+ranking bye recipients below every equal-point entry with even a very weak
+real opponent. The owner confirmed the fix: an empty opponent list floors
+to `self.floor` (0.33 under MVP1's defaults), the same floor already
+applied to individual opponents' own-MWP values elsewhere in the formula,
+rather than asserting a raw 0.0. Confirmed with the owner 2026-08-08.

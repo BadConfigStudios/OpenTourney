@@ -73,12 +73,26 @@ def test_oomw_averages_opponents_omw_percentages():
     tiebreaks = OwpOomwTiebreak().compute([a, b, c, d], [round1, round2])
 
     # a: 3 pts / 2 rounds = 0.5 own MWP. c: 6 pts / 2 rounds = 1.0 own MWP.
-    # b's only opponent is a -> OMW%(b) = 0.5. d's only opponent is c -> OMW%(d) = 1.0.
+    # b's only opponent is a -> OMW%(b) = 0.5. c's opponents are d and a,
+    # so OMW%(c) averages their own MWPs: own_mwp(d) and own_mwp(a).
     # a's opponents are b and c -> OOMW%(a) averages OMW%(b) and OMW%(c).
     omw_b = 0.5
-    omw_d = max(0 / (3 * 1), 0.33)  # d's own MWP
-    omw_c = (omw_d + 0.5) / 2  # OMW%(c) = avg(own_mwp[d], own_mwp[a])
+    own_mwp_d = max(0 / (3 * 1), 0.33)  # d's own MWP (0 pts / 1 round played)
+    omw_c = (own_mwp_d + 0.5) / 2  # OMW%(c) = avg(own_mwp[d], own_mwp[a])
     assert tiebreaks[a.id][1] == pytest.approx((omw_b + omw_c) / 2)
+
+
+def test_bye_only_entry_gets_floor_omw_not_zero():
+    a, b = _entry(), _entry()
+    round1 = _round(1, [_match(a, None)])  # a receives a bye, no real opponent yet
+
+    tiebreaks = OwpOomwTiebreak().compute([a, b], [round1])
+
+    # a has zero real opponents faced -- OMW%/OOMW% must floor to 0.33,
+    # not silently drop to 0.0 and rank a below entries with a real
+    # (even weak) opponent.
+    assert tiebreaks[a.id][0] == pytest.approx(0.33)
+    assert tiebreaks[a.id][1] == pytest.approx(0.33)
 
 
 def test_custom_point_values_and_floor_are_respected():
