@@ -15,16 +15,23 @@ convention = {
 
 
 class Base(DeclarativeBase):
+    """Declarative base for all OpenTourney ORM models, with a fixed
+    Alembic-friendly constraint-naming convention."""
+
     metadata = MetaData(naming_convention=convention)
 
 
 class UUIDPrimaryKeyMixin:
+    """Adds a server-generated UUID primary key (`id`) to a model."""
+
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
 
 
 class TimestampMixin:
+    """Adds a `created_at` column, set once by the database on insert."""
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

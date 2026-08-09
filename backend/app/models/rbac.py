@@ -9,11 +9,19 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class PodRoleName(str, enum.Enum):
+    """Roles grantable within a single Pod. `SCOREKEEPER` may report match
+    results; `USER` is a non-privileged grant (currently unused by any
+    authorization check, reserved for future use)."""
+
     SCOREKEEPER = "scorekeeper"
     USER = "user"
 
 
 class EventOrganizer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Grants one external identity (`player_uuid` + `source_system`,
+    NFR4) organizer rights over an Event — create/update Pods and Entries,
+    generate rounds, complete the event."""
+
     __tablename__ = "event_organizers"
     __table_args__ = (
         UniqueConstraint(
@@ -29,6 +37,10 @@ class EventOrganizer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 
 class PodRole(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Grants one external identity a `PodRoleName` role scoped to a
+    single Pod, independent of any `EventOrganizer` grant on the parent
+    Event."""
+
     __tablename__ = "pod_roles"
     __table_args__ = (
         UniqueConstraint("pod_id", "player_uuid", "source_system", name="uq_pod_role_identity"),

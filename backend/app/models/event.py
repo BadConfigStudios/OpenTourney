@@ -6,6 +6,12 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class Event(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A single-day in-person tournament event, identified by its date.
+
+    MVP1 restricts an Event to at most one Pod — see `Pod`'s
+    `uq_pod_event` unique constraint.
+    """
+
     __tablename__ = "events"
 
     # NOTE: the type is imported as `dt` (not `from datetime import date`)
