@@ -229,6 +229,7 @@
         "type": "object"
       },
       "MatchResult": {
+        "description": "A match's outcome. `UNREPORTED` until a result is submitted via\n`POST /matches/{match_id}/result`; terminal values are the two win\noutcomes and `TIE` (draw).",
         "enum": [
           "unreported",
           "entry1_win",
@@ -384,6 +385,7 @@
         "type": "object"
       },
       "PodRoleName": {
+        "description": "Roles grantable within a single Pod. `SCOREKEEPER` may report match\nresults; `USER` is a non-privileged grant (currently unused by any\nauthorization check, reserved for future use).",
         "enum": [
           "scorekeeper",
           "user"
