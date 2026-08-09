@@ -15,6 +15,12 @@ frontend:
     pullPolicy: Always
   replicas: 1
 
+docs:
+  image:
+    tag: latest
+    pullPolicy: Always
+  replicas: 1
+
 percona:
   enabled: true
   clusterName: opentourney-staging-pg
