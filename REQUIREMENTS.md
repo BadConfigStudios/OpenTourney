@@ -48,9 +48,18 @@ behind each decision reflected here.
 | FR21 | Operational UI: BO1 scoring, gated by RBAC role | BR1 | 7 |
 | FR22 | Operational UI: final report display | BR1 | 7 |
 | FR23 | Sphinx docs content: data-model reference (autodoc), API usage guide, deployment guide — versioned per release | BR2 | 9 |
-| FR24 | Dynamic Swiss round-target: recompute `ceil(log2(active_entries))` from non-dropped entries before each round's pairing, surface the reason to the organizer when it changes; entry drop tracking (`Entry.dropped_at_round`) | BR1 | TBD (post-MVP1) |
+| FR24 | Dynamic Swiss round-target: recompute `ceil(log2(active_entries))` from non-dropped entries before each round's pairing, surface the reason to the organizer when it changes; entry drop tracking (`Entry.dropped_at_round`) | BR1 | 10 |
 | FR25 | Real Swiss standings tiebreakers (OMW%, OOMW%), computed via a pluggable tiebreak-calculation interface rather than hardcoded into `SwissFormat` — so a future tournament format or game module can supply different tiebreak math (e.g. Buchholz, Sonneborn-Berger) without touching pairing/report code; MVP1 ships only the OMW%/OOMW% implementation behind it, replacing the UUID-string tiebreak | BR1, BR4 | 8 |
 | FR26 | Operational UI: persona switcher (pre-minted static-JWKS Organizer/Scorekeeper/Player tokens), not a real login flow — MVP1 auth simplification, see `DECISIONS.md` 2026-08-03 | BR1 | 7 |
+
+## Functional Requirements (FR) — MVP2
+
+| ID | Requirement | Serves | Phase |
+|----|-------------|--------|-------|
+| FR27 | Pokémon `GameModule` — descriptive only, no rules enforcement (per README's design principle): Bo1-by-default reporting (Bo1 is explicit organizer discretion per the official Play! Pokémon Tournament Rules Handbook §5.5.6), match-point constants matching MVP1's existing defaults (Win=3, Tie=1, Loss=0 — identical to the handbook's §5.3.2), and a `decklist_url` convention in `Entry.metadata_` (plain link to an externally-hosted public decklist, e.g. Limitless — no OpenTourney-hosted decklist builder/validator) | BR1, BR4 | 11 |
+| FR28 | Pokémon tiebreak strategy: Op Win% / Op Op Win% chain per the handbook §5.3.3 — 25% floor (not MTG's 33%), 100% max win% for completed entries vs. 75% max for dropped entries (depends on FR24's drop tracking), bye rounds excluded from a competitor's own win% when that competitor is later used as someone else's Op Win% input (§5.3.3.1) — a different bye nuance than FR25's bye-floor treatment | BR1, BR4 | 12 |
+| FR29 | Head-to-head as a third tiebreaker level (handbook §5.5.1.1's final tiebreaker before random/last-resort ordering) — extends the pluggable `TiebreakStrategy` interface (FR25) to support a pairwise fallback comparison, consumed by FR28's Pokémon strategy | BR1, BR4 | 12 |
+| FR30 | Real login flow: OIDC Authorization Code flow (Google) in the operational UI for prod, config-selectable per deployment alongside the existing persona-switcher (FR26, kept for staging/dev) — no new backend auth code required, `RemoteJWKSProvider` (`backend/app/auth/jwks.py`) already supports a real remote issuer, this is frontend + prod config | BR1 | 13 |
 
 ## Non-Functional Requirements (NFR)
 
@@ -80,13 +89,13 @@ on the Kubernetes staging environment, with Sphinx docs covering the data
 model, API usage, and deployment.
 
 **Deferred to future MVPs** (core scope, sequenced later, not
-architectural non-goals): Pokémon TCG (and other) `GameModule`s,
-single/double-elimination and multi-phase `TournamentFormat`s, BO3,
-self-service player registration, online modality (per-game module:
-username discovery, friending instructions, match setup), dynamic Swiss
-round-target recalculation from mid-tournament drops (FR24) — Phase 6
-covers organizer-triggered round generation and manual early completion,
-but not automatic target adjustment when entries drop.
+architectural non-goals): single/double-elimination and multi-phase
+`TournamentFormat`s (Top Cut), BO3, self-service player registration,
+online modality (per-game module: username discovery, friending
+instructions, match setup). Pokémon TCG `GameModule` and dynamic Swiss
+round-target/drop-tracking (FR24) move to MVP2 (below) — Phase 6 covers
+organizer-triggered round generation and manual early completion, but not
+automatic target adjustment when entries drop.
 
 **Roadmap** (auxiliary/integration work, see README): SAML/LDAP auth,
 embeddable UI module, presentation mode, public meta/analytics API,
@@ -98,6 +107,30 @@ player-facing pairing view + self-reporting + deconfliction workflow
 (#49); self-serve organization onboarding + abuse controls, tiering model
 (#50, #51) — see `ROADMAP.md` for full detail. None of this is scheduled
 to an MVP/phase yet.
+
+### MVP2 — Pokémon Live Launch (target `v0.2.0`)
+
+Serves BR1, BR4 / FR24, FR27–FR30. Phases 10–14.
+
+**Acceptance**: An Organizer can run a real single-phase Swiss Bo1
+Pokémon TCG event with real players authenticated via Google — pairings
+and standings computed with Pokémon's official tiebreaker math (Op Win% /
+Op Op Win% / head-to-head, per the Play! Pokémon Tournament Rules
+Handbook), entries can be dropped mid-event with the Swiss round target
+recomputing accordingly, and players' decklists are linked (not hosted)
+via an externally-shared URL.
+
+**Deferred to future MVPs**: Apple/Facebook social login and the
+self-hosted Zitadel identity broker (`DECISIONS.md` 2026-08-09) — MVP2
+ships Google-only, single-tenant, at the shared prod environment
+(`opentourney.badconfig.com`); multi-tenant/per-customer auth is later
+scope. OpenTourney-hosted decklist building/validation — MVP2 only links
+to an externally-hosted public decklist (e.g. Limitless). Top Cut/
+single-elimination phase — MVP2 is Swiss-only, single phase.
+
+**External to this repo**: prod deployment is Fleet-managed from a
+separate ops repo (`DECISIONS.md` 2026-08-09) — no fleet.yaml or GitOps
+manifests belong in `OpenTourney` itself.
 
 ## Build Order
 
@@ -112,3 +145,8 @@ to an MVP/phase yet.
 | 7 | Operational UI (setup, pairings, scoring, final report, persona switcher) | MVP1 |
 | 8 | Swiss real tiebreakers (OMW%/OOMW% behind a pluggable tiebreak-calculation interface, replacing the UUID tiebreak in pairing + final report) | MVP1 |
 | 9 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 — done |
+| 10 | Entry drop tracking + dynamic Swiss round-target recompute (FR24) | MVP2 |
+| 11 | Pokémon `GameModule` (Bo1 defaults, match-point constants, `decklist_url` convention) (FR27) | MVP2 |
+| 12 | Pokémon tiebreak strategy (Op Win%/Op Op Win%, 25% floor, dropped-entry handling) + head-to-head tiebreaker fallback (FR28, FR29) | MVP2 |
+| 13 | Real login flow: Google OIDC Authorization Code in the operational UI, config-selectable alongside the persona-switcher (FR30) | MVP2 |
+| 14 | MVP2 verification + release cut (`v0.2.0`) | MVP2 |
