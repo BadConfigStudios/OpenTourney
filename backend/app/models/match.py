@@ -11,6 +11,10 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class MatchResult(str, enum.Enum):
+    """A match's outcome. `UNREPORTED` until a result is submitted via
+    `POST /matches/{match_id}/result`; terminal values are the two win
+    outcomes and `TIE` (draw)."""
+
     UNREPORTED = "unreported"
     ENTRY1_WIN = "entry1_win"
     ENTRY2_WIN = "entry2_win"
@@ -18,6 +22,15 @@ class MatchResult(str, enum.Enum):
 
 
 class Match(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A single pairing between two entries within a Round.
+
+    `entry2_id` is nullable — `None` marks a bye (`entry1_id` receives an
+    automatic win, no result reporting required). `confirmed_by` is a
+    JSONB audit-trail list recording who confirmed the reported result;
+    `reported_by`/`witnessed_by` are set from the reporting identity's
+    `source_system:player_uuid` (see `report_match_result`).
+    """
+
     __tablename__ = "matches"
 
     round_id: Mapped[uuid.UUID] = mapped_column(

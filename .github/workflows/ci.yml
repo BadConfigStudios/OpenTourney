@@ -83,3 +83,4 @@ jobs:
       - run: docker build -t opentourney-frontend ./frontend
       - run: docker build -t opentourney-backend-prod -f backend/Dockerfile.prod ./backend
       - run: docker build -t opentourney-frontend-prod -f frontend/Dockerfile.prod ./frontend
+      - run: docker build -t opentourney-docs -f docs/Dockerfile.docs .

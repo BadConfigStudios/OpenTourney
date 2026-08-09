@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: docs
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: docs
+spec:
+  selector:
+    app.kubernetes.io/component: docs
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - port: 80
+      targetPort: {{ .Values.docs.port }}

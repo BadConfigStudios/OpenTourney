@@ -28,7 +28,7 @@ Staging deploys the current feature branch to the cube cluster (k3s on openSUSE
 MicroOS) **before** merging to `main`, so changes are validated against a real
 cluster and real Postgres prior to merge. This is a manual `helm` workflow —
 staging is not managed by Fleet/GitOps (no production release exists yet; that
-lands with the `v0.1.0` cut in Phase 8).
+lands with the `v0.1.0` cut in Phase 9).
 
 ### Prerequisites
 
@@ -94,6 +94,7 @@ alone:
    ```bash
    docker build --platform linux/amd64 -t ghcr.io/badconfigstudios/opentourney/backend:<tag> -f backend/Dockerfile.prod ./backend
    docker build --platform linux/amd64 -t ghcr.io/badconfigstudios/opentourney/frontend:<tag> -f frontend/Dockerfile.prod ./frontend
+   docker build --platform linux/amd64 -t ghcr.io/badconfigstudios/opentourney/docs:<tag> -f docs/Dockerfile.docs .
    ```
 
 2. **Push to GHCR**:
@@ -101,6 +102,7 @@ alone:
    ```bash
    docker push ghcr.io/badconfigstudios/opentourney/backend:<tag>
    docker push ghcr.io/badconfigstudios/opentourney/frontend:<tag>
+   docker push ghcr.io/badconfigstudios/opentourney/docs:<tag>
    ```
 
 3. **Deploy/update the release**:
@@ -111,6 +113,7 @@ alone:
      -f charts/opentourney/values.staging.yaml \
      --set backend.image.tag=<tag> \
      --set frontend.image.tag=<tag> \
+     --set docs.image.tag=<tag> \
      --set-string secrets.databaseUrl=<database-url> \
      --set-string secrets.oidcIssuer=<oidc-issuer> \
      --set-string secrets.oidcAudience=<oidc-audience> \

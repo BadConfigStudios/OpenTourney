@@ -18,6 +18,14 @@ frontend:
   replicas: 1
   port: 80
 
+docs:
+  image:
+    repository: ghcr.io/badconfigstudios/opentourney/docs
+    tag: latest
+    pullPolicy: Always
+  replicas: 1
+  port: 80
+
 # Percona PostgreSQL Operator CRD
 percona:
   enabled: true

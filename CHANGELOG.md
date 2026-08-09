@@ -5,5 +5,30 @@ MVP tag. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en
 
 ## [Unreleased]
 
-MVP1 (target `v0.1.0`) in progress — see `REQUIREMENTS.md` for scope and
-`DECISIONS.md` for the design decisions behind it.
+## [0.1.0] — MVP1: Core In-Person Swiss Engine
+
+Serves BR1-BR4 / FR1-23, FR25-26. Full Build Order: phases 1-9.
+
+### Added
+
+- Repo scaffold (FastAPI + React/TS/Vite), CI, Sphinx docs scaffold (Phase 1)
+- Kubernetes staging deployment via Helm + Percona PG Operator (Phase 2)
+- Domain model: Event/Pod/Entry/Round/Match, `TournamentFormat` +
+  `GameModule` plugin interfaces (Phase 3)
+- Swiss pairing/round generation and seating (Phase 4)
+- Operational API, RBAC, OIDC auth, published OpenAPI spec (Phase 5)
+- Match and tournament reporting: BO1 results with provenance, final
+  report (Phase 6)
+- Operational UI: setup, pairings/seating, BO1 scoring, final report,
+  persona switcher (Phase 7)
+- Real Swiss tiebreakers (OMW%/OOMW%) behind a pluggable
+  `TiebreakStrategy` interface, replacing the UUID-string stopgap (Phase 8,
+  FR25)
+- Versioned Sphinx docs site: data-model reference (autodoc), API usage
+  guide, deployment guide; served by a new Helm-managed `docs` component
+  (Phase 9, FR23)
+
+### Known follow-ups (not blocking, tracked as issues)
+
+- #57 — tiebreak API/UI wire contract has no label/strategy identifier;
+  needed before a second `TiebreakStrategy` family ships under #41.

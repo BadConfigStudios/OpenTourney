@@ -7,3 +7,7 @@ Game-agnostic, open tournament-tracking standard and engine.
 
 .. toctree::
    :maxdepth: 2
+
+   data-model
+   api-usage
+   deployment

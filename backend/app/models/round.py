@@ -12,6 +12,13 @@ if TYPE_CHECKING:
 
 
 class Round(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """One generated round of pairings within a Pod's Swiss sequence.
+
+    `number` is 1-indexed and unique per pod. `matches` holds every
+    pairing generated for this round, including byes (a `Match` with
+    `entry2_id is None`), ordered by insertion.
+    """
+
     __tablename__ = "rounds"
     __table_args__ = (UniqueConstraint("pod_id", "number", name="uq_round_number_per_pod"),)
 
