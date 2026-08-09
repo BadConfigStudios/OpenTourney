@@ -28,7 +28,7 @@ Staging deploys the current feature branch to the cube cluster (k3s on openSUSE
 MicroOS) **before** merging to `main`, so changes are validated against a real
 cluster and real Postgres prior to merge. This is a manual `helm` workflow —
 staging is not managed by Fleet/GitOps (no production release exists yet; that
-lands with the `v0.1.0` cut in Phase 8).
+lands with the `v0.1.0` cut in Phase 9).
 
 ### Prerequisites
 
