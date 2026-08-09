@@ -367,3 +367,36 @@ real opponent. The owner confirmed the fix: an empty opponent list floors
 to `self.floor` (0.33 under MVP1's defaults), the same floor already
 applied to individual opponents' own-MWP values elsewhere in the formula,
 rather than asserting a raw 0.0. Confirmed with the owner 2026-08-08.
+
+## 2026-08-09 — Prod auth: self-hosted Zitadel, one instance per customer namespace
+
+Prod (deployed outside this repo, via Fleet) needs social login — Google,
+Apple, and Facebook. Facebook isn't standard OIDC/JWKS like Google and
+Apple are, so extending `backend/app/auth`'s single-issuer JWKS
+verification to a trusted-issuer list would still need a bespoke
+non-JWKS path for Facebook. Chose a third-party identity broker instead:
+the backend keeps verifying exactly one issuer/JWKS (no auth code
+changes), the broker federates all three providers and normalizes to one
+JWT.
+
+Broker: **Zitadel**, self-hosted, deployed as an optional component of
+`charts/opentourney` (same pattern as the `docs`/`percona` toggles) —
+chosen over Keycloak (JVM, much heavier per-instance) and Ory
+Kratos+Hydra (more assembly, weaker turnkey social-login support) for
+being a single lightweight Go binary, cheap enough to run **one instance
+per customer namespace** rather than one shared multi-org instance.
+
+This matches OpenTourney's existing per-namespace deployment shape (each
+namespace already gets its own full stack — backend/frontend/docs/pg,
+see `opentourney-staging`) — one Zitadel per namespace keeps that same
+isolation blast radius (a broker issue in one customer's namespace can't
+affect another's), at the cost of more resource overhead than a single
+shared instance using Zitadel's built-in multi-org multi-tenancy. Each
+instance reuses its namespace's existing Percona Postgres cluster (its
+own schema) rather than a new DB engine.
+
+Staging keeps today's static-JWKS persona-switcher (FR26) — no broker,
+no real Google/Apple/Facebook accounts needed there, consistent with
+minimizing staging's external dependencies. Confirmed with the owner
+2026-08-09. Not yet scoped into a requirements-doc entry or roadmap
+issue — implementation is future MVP work, not started.
