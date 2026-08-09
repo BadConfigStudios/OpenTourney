@@ -111,4 +111,4 @@ to an MVP/phase yet.
 | 6 | Match & tournament reporting (BO1 + provenance + final report) | MVP1 |
 | 7 | Operational UI (setup, pairings, scoring, final report, persona switcher) | MVP1 |
 | 8 | Swiss real tiebreakers (OMW%/OOMW% behind a pluggable tiebreak-calculation interface, replacing the UUID tiebreak in pairing + final report) | MVP1 |
-| 9 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 |
+| 9 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 — done |
