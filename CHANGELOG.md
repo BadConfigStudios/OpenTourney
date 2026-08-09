@@ -25,7 +25,8 @@ Serves BR1-BR4 / FR1-23, FR25-26. Full Build Order: phases 1-9.
   `TiebreakStrategy` interface, replacing the UUID-string stopgap (Phase 8,
   FR25)
 - Versioned Sphinx docs site: data-model reference (autodoc), API usage
-  guide, deployment guide; deployed to staging (Phase 9, FR23)
+  guide, deployment guide; served by a new Helm-managed `docs` component
+  (Phase 9, FR23)
 
 ### Known follow-ups (not blocking, tracked as issues)
 

@@ -7,12 +7,15 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "docs/**"
+      - "charts/**"
       - ".github/workflows/build-push.yml"
 
 env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/badconfigstudios/opentourney/backend
   FRONTEND_IMAGE: ghcr.io/badconfigstudios/opentourney/frontend
+  DOCS_IMAGE: ghcr.io/badconfigstudios/opentourney/docs
 
 jobs:
   build-backend:
@@ -73,6 +76,37 @@ jobs:
         with:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  build-docs:
+    runs-on: badconfig-runners
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.DOCS_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docs/Dockerfile.docs
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
