@@ -24,13 +24,15 @@ class SwissFormat(TournamentFormat):
     def generate_round(
         self, entries: Sequence[Entry], previous_rounds: Sequence[Round]
     ) -> list[Pairing]:
+        active_entries = [entry for entry in entries if entry.dropped_at_round is None]
+
         if not previous_rounds:
-            return _pair_round_one(entries)
+            return _pair_round_one(active_entries)
 
         standings, bye_used = _compute_standings(entries, previous_rounds)
         tiebreaks = self.tiebreak.compute(entries, previous_rounds)
         already_paired = _paired_history(previous_rounds)
-        ranked = _rank_entries(entries, standings, tiebreaks)
+        ranked = _rank_entries(active_entries, standings, tiebreaks)
 
         bye_entry = None
         if len(ranked) % 2 == 1:

@@ -6,13 +6,14 @@ from app.formats.swiss import SwissFormat, _compute_standings
 from app.models import Entry, Match, MatchResult, Round
 
 
-def _entry() -> Entry:
+def _entry(dropped_at_round: int | None = None) -> Entry:
     return Entry(
         id=uuid.uuid4(),
         pod_id=uuid.uuid4(),
         player_uuid=uuid.uuid4(),
         source_system="test",
         metadata_={},
+        dropped_at_round=dropped_at_round,
     )
 
 
@@ -386,3 +387,40 @@ def test_rank_entries_orders_by_points_then_tiebreak_then_uuid():
     # e_tied_a/e_tied_b are tied on both points AND tiebreak -- UUID string
     # order is the last-resort fallback.
     assert [r.id for r in ranked[:2]] == sorted([e_tied_a.id, e_tied_b.id], key=str)
+
+
+def test_generate_round_excludes_dropped_entries_from_round_one():
+    active = [_entry(), _entry(), _entry()]
+    dropped = _entry(dropped_at_round=0)
+    entries = [*active, dropped]
+
+    pairings = SwissFormat().generate_round(entries=entries, previous_rounds=[])
+
+    paired_ids = {pairing.entry1_id for pairing in pairings} | {
+        pairing.entry2_id for pairing in pairings if pairing.entry2_id is not None
+    }
+    assert dropped.id not in paired_ids
+    assert paired_ids == {entry.id for entry in active}
+
+
+def test_generate_round_excludes_dropped_entries_from_later_rounds():
+    active = [_entry(), _entry(), _entry()]
+    dropped = _entry(dropped_at_round=1)
+    entries = [*active, dropped]
+
+    match_r1 = Match(
+        id=uuid.uuid4(),
+        entry1_id=active[0].id,
+        entry2_id=active[1].id,
+        result=MatchResult.ENTRY1_WIN,
+    )
+    bye_r1 = Match(id=uuid.uuid4(), entry1_id=active[2].id, entry2_id=None)
+    dropped_match_r1 = Match(id=uuid.uuid4(), entry1_id=dropped.id, entry2_id=None)
+    round_1 = _round(1, [match_r1, bye_r1, dropped_match_r1])
+
+    pairings = SwissFormat().generate_round(entries=entries, previous_rounds=[round_1])
+
+    paired_ids = {pairing.entry1_id for pairing in pairings} | {
+        pairing.entry2_id for pairing in pairings if pairing.entry2_id is not None
+    }
+    assert dropped.id not in paired_ids
