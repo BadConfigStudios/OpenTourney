@@ -60,3 +60,33 @@ def test_entry_requires_existing_pod(db_session):
 
     with pytest.raises(IntegrityError):
         db_session.commit()
+
+
+def test_entry_dropped_at_round_defaults_to_none(db_session):
+    pod = _make_pod(db_session)
+    entry = Entry(
+        pod_id=pod.id,
+        player_uuid=uuid.uuid4(),
+        source_system="club-checkin",
+        metadata_={},
+    )
+    db_session.add(entry)
+    db_session.commit()
+
+    assert entry.dropped_at_round is None
+
+
+def test_entry_dropped_at_round_persists(db_session):
+    pod = _make_pod(db_session)
+    entry = Entry(
+        pod_id=pod.id,
+        player_uuid=uuid.uuid4(),
+        source_system="club-checkin",
+        metadata_={},
+        dropped_at_round=2,
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+
+    assert entry.dropped_at_round == 2

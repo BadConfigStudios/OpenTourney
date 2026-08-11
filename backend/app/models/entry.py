@@ -38,3 +38,4 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     metadata_: Mapped[dict] = mapped_column(
         "metadata", MutableDict.as_mutable(JSONB), nullable=False, default=dict
     )
+    dropped_at_round: Mapped[int | None] = mapped_column(nullable=True, default=None)

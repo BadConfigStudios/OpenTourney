@@ -22,3 +22,4 @@ class EntryRead(BaseModel):
     player_uuid: uuid.UUID
     source_system: str
     metadata: dict = Field(validation_alias="metadata_")
+    dropped_at_round: int | None
