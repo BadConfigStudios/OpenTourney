@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { createEntry, deleteEntry, listEntries, updateEntryDisplayName, type EntryRead } from "../api/entries";
+import {
+  createEntry,
+  deleteEntry,
+  dropEntry,
+  undropEntry,
+  listEntries,
+  updateEntryDisplayName,
+  type EntryRead,
+} from "../api/entries";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
 
-export function EntryRoster({ podId }: { podId: string }) {
+export function EntryRoster({ podId, podCompletedAt }: { podId: string; podCompletedAt: string | null }) {
   const { apiFetch, currentPersona } = useAuth();
   const queryClient = useQueryClient();
   const isOrganizer = currentPersona.role === "organizer";
@@ -30,6 +38,14 @@ export function EntryRoster({ podId }: { podId: string }) {
     mutationFn: (entryId: string) => deleteEntry(apiFetch, entryId),
     onSuccess: invalidate,
   });
+  const dropMutation = useMutation({
+    mutationFn: (entryId: string) => dropEntry(apiFetch, entryId),
+    onSuccess: invalidate,
+  });
+  const undropMutation = useMutation({
+    mutationFn: (entryId: string) => undropEntry(apiFetch, entryId),
+    onSuccess: invalidate,
+  });
 
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -38,7 +54,16 @@ export function EntryRoster({ podId }: { podId: string }) {
   return (
     <div>
       <h3 className="mb-2 font-semibold">Entries</h3>
-      <ErrorBanner error={createMutation.error ?? updateMutation.error ?? deleteMutation.error ?? error} />
+      <ErrorBanner
+        error={
+          createMutation.error ??
+          updateMutation.error ??
+          deleteMutation.error ??
+          dropMutation.error ??
+          undropMutation.error ??
+          error
+        }
+      />
       {isLoading && <p>Loading…</p>}
       {entries && entries.length === 0 && <p>No entries yet.</p>}
       {entries && entries.length > 0 && (
@@ -88,6 +113,32 @@ export function EntryRoster({ podId }: { podId: string }) {
                     >
                       Delete
                     </button>
+                    {podCompletedAt === null &&
+                      (entry.dropped_at_round === null ? (
+                        <button
+                          aria-label={`Drop ${entry.metadata.display_name ?? entry.id}`}
+                          onClick={() => {
+                            createMutation.reset();
+                            updateMutation.reset();
+                            deleteMutation.reset();
+                            dropMutation.mutate(entry.id);
+                          }}
+                        >
+                          Drop
+                        </button>
+                      ) : (
+                        <button
+                          aria-label={`Undrop ${entry.metadata.display_name ?? entry.id}`}
+                          onClick={() => {
+                            createMutation.reset();
+                            updateMutation.reset();
+                            deleteMutation.reset();
+                            undropMutation.mutate(entry.id);
+                          }}
+                        >
+                          Undrop
+                        </button>
+                      ))}
                   </span>
                 )}
               </li>
