@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { displayNameFor, listEntries, type EntryRead } from "../api/entries";
 import { reportMatchResult, type MatchRead } from "../api/matches";
+import { fetchPodReport } from "../api/report";
 import { fetchRounds, generateRound } from "../api/rounds";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
@@ -33,6 +34,10 @@ export function Pairings() {
     queryKey: ["entries", podId],
     queryFn: () => listEntries(apiFetch, podId),
   });
+  const reportQuery = useQuery({
+    queryKey: ["report", podId],
+    queryFn: () => fetchPodReport(apiFetch, podId),
+  });
 
   const reportMutation = useMutation({
     mutationFn: (args: { matchId: string; result: "entry1_win" | "entry2_win" | "tie" }) =>
@@ -51,6 +56,7 @@ export function Pairings() {
     mutationFn: () => generateRound(apiFetch, podId),
     onSuccess: (newRound) => {
       queryClient.invalidateQueries({ queryKey: ["rounds", podId] });
+      queryClient.invalidateQueries({ queryKey: ["report", podId] });
       setSelectedRoundNumber(newRound.number);
     },
   });
@@ -58,6 +64,18 @@ export function Pairings() {
   const effectiveRoundNumber = selectedRoundNumber ?? latestRound?.number ?? null;
   const selectedRound = rounds.find((round) => round.number === effectiveRoundNumber);
   const isLatestRound = effectiveRoundNumber !== null && effectiveRoundNumber === latestRound?.number;
+
+  const previousRecommendedRounds = useRef<number | null>(null);
+  const recommendedRounds = reportQuery.data?.recommended_rounds ?? null;
+  const roundTargetChangedFrom =
+    recommendedRounds !== null &&
+    previousRecommendedRounds.current !== null &&
+    previousRecommendedRounds.current !== recommendedRounds
+      ? previousRecommendedRounds.current
+      : null;
+  if (recommendedRounds !== null) {
+    previousRecommendedRounds.current = recommendedRounds;
+  }
 
   return (
     <div>
@@ -68,10 +86,24 @@ export function Pairings() {
       </p>
       <h2 className="mb-4 text-lg font-semibold">Pairings</h2>
       <ErrorBanner
-        error={roundsQuery.error ?? entriesQuery.error ?? reportMutation.error ?? generateMutation.error}
+        error={
+          roundsQuery.error ?? entriesQuery.error ?? reportQuery.error ?? reportMutation.error ?? generateMutation.error
+        }
       />
 
       {(roundsQuery.isLoading || entriesQuery.isLoading) && <p>Loading…</p>}
+
+      {reportQuery.data && (
+        <p className="mb-2 text-sm text-gray-600">
+          Recommended rounds: {reportQuery.data.recommended_rounds} (active entries:{" "}
+          {reportQuery.data.active_entry_count})
+        </p>
+      )}
+      {roundTargetChangedFrom !== null && (
+        <p className="mb-2 text-sm text-amber-600">
+          Round target changed from {roundTargetChangedFrom} to {recommendedRounds}
+        </p>
+      )}
 
       {isOrganizer && (
         <button
