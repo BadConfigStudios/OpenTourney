@@ -14,7 +14,7 @@ from app.auth.identity import Identity
 from app.db import get_db_session
 from app.games.base import GameModule
 from app.games.registry import get_game_module
-from app.models import Entry, Pod
+from app.models import Entry, Pod, Round
 from app.schemas.entry import EntryCreate, EntryRead, EntryUpdate
 
 router = APIRouter(prefix="/entries", tags=["entries"])
@@ -155,3 +155,46 @@ def delete_entry(
     )
     db.delete(entry)
     db.commit()
+
+
+@router.post("/{entry_id}/drop", response_model=EntryRead)
+def drop_entry(
+    entry_id: uuid.UUID,
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
+) -> Entry:
+    entry = _get_entry_or_404(db, entry_id)
+    pod = db.get(Pod, entry.pod_id)
+    _require_pod_event_organizer(
+        db, identity, pod, "Organizer role required for this entry's pod's event"
+    )
+    if entry.dropped_at_round is not None:
+        raise HTTPException(status_code=409, detail="entry is already dropped")
+    if pod.completed_at is not None:
+        raise HTTPException(status_code=409, detail="pod is already complete")
+
+    round_count = db.query(Round).filter_by(pod_id=entry.pod_id).count()
+    entry.dropped_at_round = round_count
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+@router.post("/{entry_id}/undrop", response_model=EntryRead)
+def undrop_entry(
+    entry_id: uuid.UUID,
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
+) -> Entry:
+    entry = _get_entry_or_404(db, entry_id)
+    pod = db.get(Pod, entry.pod_id)
+    _require_pod_event_organizer(
+        db, identity, pod, "Organizer role required for this entry's pod's event"
+    )
+    if entry.dropped_at_round is None:
+        raise HTTPException(status_code=409, detail="entry is not dropped")
+
+    entry.dropped_at_round = None
+    db.commit()
+    db.refresh(entry)
+    return entry

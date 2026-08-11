@@ -34,6 +34,17 @@
       },
       "EntryRead": {
         "properties": {
+          "dropped_at_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropped At Round"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -64,7 +75,8 @@
           "pod_id",
           "player_uuid",
           "source_system",
-          "metadata"
+          "metadata",
+          "dropped_at_round"
         ],
         "title": "EntryRead",
         "type": "object"
@@ -799,6 +811,102 @@
           }
         ],
         "summary": "Update Entry",
+        "tags": [
+          "entries"
+        ]
+      }
+    },
+    "/entries/{entry_id}/drop": {
+      "post": {
+        "operationId": "drop_entry_entries__entry_id__drop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Drop Entry",
+        "tags": [
+          "entries"
+        ]
+      }
+    },
+    "/entries/{entry_id}/undrop": {
+      "post": {
+        "operationId": "undrop_entry_entries__entry_id__undrop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Undrop Entry",
         "tags": [
           "entries"
         ]
