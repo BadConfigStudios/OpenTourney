@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { displayNameFor, listEntries, type EntryRead } from "../api/entries";
 import { reportMatchResult, type MatchRead } from "../api/matches";
@@ -67,15 +67,17 @@ export function Pairings() {
 
   const previousRecommendedRounds = useRef<number | null>(null);
   const recommendedRounds = reportQuery.data?.recommended_rounds ?? null;
-  const roundTargetChangedFrom =
-    recommendedRounds !== null &&
-    previousRecommendedRounds.current !== null &&
-    previousRecommendedRounds.current !== recommendedRounds
-      ? previousRecommendedRounds.current
-      : null;
-  if (recommendedRounds !== null) {
-    previousRecommendedRounds.current = recommendedRounds;
-  }
+  const [roundTargetChangedFrom, setRoundTargetChangedFrom] = useState<number | null>(null);
+
+  useEffect(() => {
+    // reportQuery.data being undefined means "haven't fetched yet" — distinct from
+    // recommended_rounds legitimately being 0, which must not be treated as "no data".
+    if (reportQuery.data === undefined) return;
+    const next = reportQuery.data.recommended_rounds;
+    const previous = previousRecommendedRounds.current;
+    setRoundTargetChangedFrom(previous !== null && previous !== next ? previous : null);
+    previousRecommendedRounds.current = next;
+  }, [reportQuery.data?.recommended_rounds]);
 
   return (
     <div>
