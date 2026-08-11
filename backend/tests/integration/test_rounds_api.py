@@ -66,6 +66,19 @@ def test_round_generation_rejects_empty_pod(api_client, make_token):
     assert response.status_code == 409
 
 
+def test_round_generation_rejects_pod_with_only_dropped_entries(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_one = _add_entry(api_client, token, pod_id)
+    entry_two = _add_entry(api_client, token, pod_id)
+    api_client.post(f"/entries/{entry_one}/drop", headers=_auth_headers(token))
+    api_client.post(f"/entries/{entry_two}/drop", headers=_auth_headers(token))
+
+    response = api_client.post(f"/pods/{pod_id}/rounds", headers=_auth_headers(token))
+
+    assert response.status_code == 409
+
+
 def test_round_generation_rejects_unrecognized_format_slug(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, token, format_slug="single-elim")

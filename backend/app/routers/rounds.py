@@ -37,6 +37,10 @@ def generate_round(
     if not entries:
         raise HTTPException(status_code=409, detail="pod has no entries")
 
+    active_entries = [entry for entry in entries if entry.dropped_at_round is None]
+    if not active_entries:
+        raise HTTPException(status_code=409, detail="pod has no active entries")
+
     previous_rounds = db.query(Round).filter_by(pod_id=pod_id).order_by(Round.number).all()
 
     try:
