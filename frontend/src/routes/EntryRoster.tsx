@@ -81,6 +81,8 @@ export function EntryRoster({ podId, podCompletedAt }: { podId: string; podCompl
                   onClick={() => {
                     createMutation.reset();
                     deleteMutation.reset();
+                    dropMutation.reset();
+                    undropMutation.reset();
                     updateMutation.mutate({ entryId: entry.id, displayName: editingName });
                     setEditingId(null);
                   }}
@@ -108,6 +110,8 @@ export function EntryRoster({ podId, podCompletedAt }: { podId: string; podCompl
                       onClick={() => {
                         createMutation.reset();
                         updateMutation.reset();
+                        dropMutation.reset();
+                        undropMutation.reset();
                         deleteMutation.mutate(entry.id);
                       }}
                     >
@@ -152,6 +156,8 @@ export function EntryRoster({ podId, podCompletedAt }: { podId: string; podCompl
             event.preventDefault();
             updateMutation.reset();
             deleteMutation.reset();
+            dropMutation.reset();
+            undropMutation.reset();
             createMutation.mutate(newName);
             setNewName("");
           }}

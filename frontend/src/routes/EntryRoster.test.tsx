@@ -192,6 +192,30 @@ describe("EntryRoster", () => {
     expect(await screen.findByRole("button", { name: "Drop Ash" })).toBeInTheDocument();
   });
 
+  it("clears a stale drop mutation error once a different action succeeds", async () => {
+    let entries = [{ ...ASH, dropped_at_round: null }];
+    server.use(
+      http.get("/entries", () => HttpResponse.json(entries)),
+      http.post("/entries/e1/drop", () => HttpResponse.json({ detail: "drop failed" }, { status: 500 })),
+      http.delete("/entries/e1", () => {
+        entries = [];
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
+    await screen.findByText("Ash");
+
+    fireEvent.click(screen.getByRole("button", { name: "Drop Ash" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("drop failed");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Ash" }));
+
+    await waitFor(() => expect(screen.queryByText("Ash")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("hides drop/undrop buttons once the pod is complete", async () => {
     server.use(http.get("/entries", () => HttpResponse.json([ASH])));
 
