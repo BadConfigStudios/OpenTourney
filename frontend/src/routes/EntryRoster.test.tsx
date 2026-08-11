@@ -216,13 +216,39 @@ describe("EntryRoster", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("clears a stale undrop mutation error once a different entry is dropped", async () => {
+    server.use(
+      http.get("/entries", () =>
+        HttpResponse.json([
+          { ...ASH, dropped_at_round: 0 },
+          { ...MISTY, dropped_at_round: null },
+        ]),
+      ),
+      http.post("/entries/e1/undrop", () => HttpResponse.json({ detail: "undrop failed" }, { status: 500 })),
+      http.post("/entries/e2/drop", () => HttpResponse.json({ ...MISTY, dropped_at_round: 0 })),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
+    await screen.findByText("Ash");
+    await screen.findByText("Misty");
+
+    fireEvent.click(screen.getByRole("button", { name: "Undrop Ash" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("undrop failed");
+
+    fireEvent.click(screen.getByRole("button", { name: "Drop Misty" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
   it("hides drop/undrop buttons once the pod is complete", async () => {
-    server.use(http.get("/entries", () => HttpResponse.json([ASH])));
+    server.use(http.get("/entries", () => HttpResponse.json([{ ...ASH, dropped_at_round: null }])));
 
     renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt="2026-08-11T00:00:00Z" />);
 
     await screen.findByText("Ash");
     expect(screen.queryByRole("button", { name: "Drop Ash" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undrop Ash" })).not.toBeInTheDocument();
   });
 
   it("hides the edit row if the persona switches to non-Organizer mid-edit", async () => {

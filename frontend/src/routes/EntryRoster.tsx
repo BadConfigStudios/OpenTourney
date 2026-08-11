@@ -125,6 +125,7 @@ export function EntryRoster({ podId, podCompletedAt }: { podId: string; podCompl
                             createMutation.reset();
                             updateMutation.reset();
                             deleteMutation.reset();
+                            undropMutation.reset();
                             dropMutation.mutate(entry.id);
                           }}
                         >
@@ -137,6 +138,7 @@ export function EntryRoster({ podId, podCompletedAt }: { podId: string; podCompl
                             createMutation.reset();
                             updateMutation.reset();
                             deleteMutation.reset();
+                            dropMutation.reset();
                             undropMutation.mutate(entry.id);
                           }}
                         >
