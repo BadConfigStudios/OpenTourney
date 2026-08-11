@@ -15,6 +15,7 @@ from app.auth.dependencies import (
 from app.auth.identity import Identity
 from app.db import get_db_session
 from app.formats.registry import get_tournament_format_or_422
+from app.formats.round_target import recommended_rounds
 from app.games.registry import get_game_module
 from app.models import Entry, Match, MatchResult, Pod, Round
 from app.models.rbac import PodRole
@@ -172,10 +173,14 @@ def get_pod_report(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    active_entry_count = sum(1 for entry in all_entries if entry.dropped_at_round is None)
+
     return PodReport(
         is_complete=pod.completed_at is not None,
         rounds_played=len(all_rounds),
         is_partial=is_partial,
+        active_entry_count=active_entry_count,
+        recommended_rounds=recommended_rounds(active_entry_count),
         standings=[
             StandingRowRead(
                 entry_id=row.entry_id,

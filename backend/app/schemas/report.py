@@ -14,4 +14,6 @@ class PodReport(BaseModel):
     is_complete: bool
     rounds_played: int
     is_partial: bool
+    active_entry_count: int
+    recommended_rounds: int
     standings: list[StandingRowRead]

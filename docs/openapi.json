@@ -344,6 +344,10 @@
       },
       "PodReport": {
         "properties": {
+          "active_entry_count": {
+            "title": "Active Entry Count",
+            "type": "integer"
+          },
           "is_complete": {
             "title": "Is Complete",
             "type": "boolean"
@@ -351,6 +355,10 @@
           "is_partial": {
             "title": "Is Partial",
             "type": "boolean"
+          },
+          "recommended_rounds": {
+            "title": "Recommended Rounds",
+            "type": "integer"
           },
           "rounds_played": {
             "title": "Rounds Played",
@@ -368,6 +376,8 @@
           "is_complete",
           "rounds_played",
           "is_partial",
+          "active_entry_count",
+          "recommended_rounds",
           "standings"
         ],
         "title": "PodReport",

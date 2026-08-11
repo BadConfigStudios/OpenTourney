@@ -380,6 +380,8 @@ def test_report_is_empty_for_pod_with_no_entries(api_client, make_token):
         "is_complete": False,
         "rounds_played": 0,
         "is_partial": False,
+        "active_entry_count": 0,
+        "recommended_rounds": 0,
         "standings": [],
     }
 
@@ -424,6 +426,24 @@ def test_report_is_partial_when_current_round_has_unreported_matches(api_client,
     # all entries, it just has no completed-round results to award points from.
     assert len(body["standings"]) == 2
     assert {row["points"] for row in body["standings"]} == {0}
+
+
+def test_report_includes_active_entry_count_and_recommended_rounds(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_ids = [_add_entry(api_client, token, pod_id) for _ in range(4)]
+
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token))
+    body = response.json()
+    assert body["active_entry_count"] == 4
+    assert body["recommended_rounds"] == 2
+
+    api_client.post(f"/entries/{entry_ids[0]}/drop", headers=_auth_headers(token))
+
+    response = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token))
+    body = response.json()
+    assert body["active_entry_count"] == 3
+    assert body["recommended_rounds"] == 2
 
 
 def test_stranger_without_pod_access_cannot_view_report(api_client, make_token):
