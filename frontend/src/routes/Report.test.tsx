@@ -14,6 +14,8 @@ const COMPLETE_REPORT = {
   is_complete: true,
   rounds_played: 2,
   is_partial: false,
+  active_entry_count: 2,
+  recommended_rounds: 3,
   standings: [
     { entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] },
     { entry_id: "e2", points: 3, rank: 2, tiebreakers: [0.415, 0.4] },
@@ -156,7 +158,7 @@ describe("Report", () => {
   it("shows a message instead of a table when there are no standings yet", async () => {
     server.use(
       http.get("/pods/pod-1/report", () =>
-        HttpResponse.json({ is_complete: false, rounds_played: 0, is_partial: false, standings: [] }),
+        HttpResponse.json({ is_complete: false, rounds_played: 0, is_partial: false, active_entry_count: 0, recommended_rounds: 3, standings: [] }),
       ),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
     );
