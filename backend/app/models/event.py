@@ -1,5 +1,8 @@
 import datetime as dt
+import uuid
 
+from sqlalchemy import ForeignKey
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -19,3 +22,8 @@ class Event(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # against the class's own namespace; naming the column `date` would shadow
     # the imported `date` type and raise `MappedAnnotationError`.
     date: Mapped[dt.date] = mapped_column(nullable=False)
+    name: Mapped[str] = mapped_column(nullable=False)
+    description: Mapped[str | None] = mapped_column(nullable=True, default=None)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False
+    )
