@@ -6,10 +6,15 @@ from pydantic import BaseModel, ConfigDict
 
 class EventCreate(BaseModel):
     date: dt.date
+    name: str
+    description: str | None = None
+    organization_id: uuid.UUID
 
 
 class EventUpdate(BaseModel):
     date: dt.date
+    name: str
+    description: str | None = None
 
 
 class EventRead(BaseModel):
@@ -17,3 +22,6 @@ class EventRead(BaseModel):
 
     id: uuid.UUID
     date: dt.date
+    name: str
+    description: str | None
+    organization_id: uuid.UUID
