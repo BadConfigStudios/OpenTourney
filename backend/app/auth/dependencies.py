@@ -10,6 +10,7 @@ from app.auth.oidc import AuthError, AuthServiceUnavailableError, decode_token
 from app.config import Settings, get_settings
 from app.db import get_db_session
 from app.models import Event
+from app.models.organization import OrganizationMember, OrgRoleName
 from app.models.pod import Pod
 from app.models.rbac import EventOrganizer, PodRole, PodRoleName
 
@@ -64,6 +65,21 @@ def pod_role_exists(db: Session, identity: Identity, pod_id: uuid.UUID) -> bool:
         .first()
         is not None
     )
+
+
+def org_member_role(
+    db: Session, identity: Identity, organization_id: uuid.UUID
+) -> OrgRoleName | None:
+    member = (
+        db.query(OrganizationMember)
+        .filter_by(
+            organization_id=organization_id,
+            player_uuid=identity.player_uuid,
+            source_system=identity.source_system,
+        )
+        .first()
+    )
+    return member.role if member is not None else None
 
 
 def visible_event_ids(db: Session, identity: Identity) -> set[uuid.UUID]:
