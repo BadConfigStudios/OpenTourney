@@ -9,8 +9,13 @@ def _auth_headers(token: str) -> dict:
 
 
 def _create_event(api_client, token) -> str:
+    org_id = api_client.post(
+        "/organizations", json={"name": "Test Org"}, headers=_auth_headers(token)
+    ).json()["id"]
     response = api_client.post(
-        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+        "/events",
+        json={"date": "2026-09-01", "name": "Test Event", "organization_id": org_id},
+        headers=_auth_headers(token),
     )
     return response.json()["id"]
 

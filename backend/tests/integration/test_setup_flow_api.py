@@ -13,8 +13,14 @@ def test_organizer_setup_flow_create_event_pod_entries(api_client, make_token, d
     (generated player_uuid, source_system="opentourney-ui", per EntryRoster)."""
     organizer_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
 
+    org_id = api_client.post(
+        "/organizations", json={"name": "Test Org"}, headers=_auth_headers(organizer_token)
+    ).json()["id"]
+
     event_response = api_client.post(
-        "/events", json={"date": "2026-08-01"}, headers=_auth_headers(organizer_token)
+        "/events",
+        json={"date": "2026-08-01", "name": "Test Event", "organization_id": org_id},
+        headers=_auth_headers(organizer_token),
     )
     assert event_response.status_code == 201
     event_id = event_response.json()["id"]
