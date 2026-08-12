@@ -11,6 +11,8 @@ export interface PodReport {
   is_complete: boolean;
   rounds_played: number;
   is_partial: boolean;
+  active_entry_count: number;
+  recommended_rounds: number;
   standings: StandingRow[];
 }
 

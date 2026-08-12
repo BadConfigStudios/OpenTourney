@@ -6,6 +6,7 @@ export interface EntryRead {
   player_uuid: string;
   source_system: string;
   metadata: { display_name?: string; [key: string]: unknown };
+  dropped_at_round: number | null;
 }
 
 const WALK_IN_SOURCE_SYSTEM = "opentourney-ui";
@@ -41,6 +42,14 @@ export function updateEntryDisplayName(
 
 export function deleteEntry(apiFetch: ApiFetch, entryId: string): Promise<void> {
   return apiRequest(apiFetch, `/entries/${entryId}`, { method: "DELETE" });
+}
+
+export function dropEntry(apiFetch: ApiFetch, entryId: string): Promise<EntryRead> {
+  return apiRequest(apiFetch, `/entries/${entryId}/drop`, { method: "POST" });
+}
+
+export function undropEntry(apiFetch: ApiFetch, entryId: string): Promise<EntryRead> {
+  return apiRequest(apiFetch, `/entries/${entryId}/undrop`, { method: "POST" });
 }
 
 export function displayNameFor(entries: EntryRead[] | undefined, entryId: string): string {

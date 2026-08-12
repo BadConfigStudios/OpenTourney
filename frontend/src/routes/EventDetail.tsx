@@ -58,7 +58,7 @@ export function EventDetail() {
               View Report
             </Link>
           </p>
-          <EntryRoster podId={pod.id} />
+          <EntryRoster podId={pod.id} podCompletedAt={pod.completed_at} />
         </>
       )}
     </div>

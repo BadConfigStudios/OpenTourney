@@ -81,6 +81,19 @@ const ROUND_3_UNREPORTED: RoundRead = {
   ],
 };
 
+function reportHandler() {
+  return http.get("/pods/pod-1/report", () =>
+    HttpResponse.json({
+      is_complete: false,
+      rounds_played: 0,
+      is_partial: false,
+      active_entry_count: 2,
+      recommended_rounds: 1,
+      standings: [],
+    }),
+  );
+}
+
 function renderPairings(personaLabel?: string) {
   renderWithProviders(<Pairings />, {
     path: "/pods/pod-1/pairings",
@@ -100,6 +113,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1, ROUND_2])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings();
@@ -111,6 +125,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1, ROUND_2])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings();
@@ -125,6 +140,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1, ROUND_2])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings();
@@ -143,6 +159,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings();
@@ -160,6 +177,7 @@ describe("Pairings", () => {
         matches = [{ ...matches[0], result: body.result }];
         return HttpResponse.json(matches[0]);
       }),
+      reportHandler(),
     );
 
     renderPairings();
@@ -172,6 +190,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_3_UNREPORTED])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings("Scorekeeper");
@@ -183,6 +202,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_3_UNREPORTED])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings("Player");
@@ -195,6 +215,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings();
@@ -208,6 +229,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([pastUnreported, ROUND_2])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings();
@@ -228,6 +250,7 @@ describe("Pairings", () => {
         rounds = [...rounds, ROUND_2];
         return HttpResponse.json(ROUND_2, { status: 201 });
       }),
+      reportHandler(),
     );
 
     renderPairings();
@@ -242,6 +265,7 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_3_UNREPORTED])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings();
@@ -253,11 +277,65 @@ describe("Pairings", () => {
     server.use(
       http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1])),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      reportHandler(),
     );
 
     renderPairings("Scorekeeper");
 
     await screen.findByText(/Table 1: Ash vs Misty/);
     expect(screen.queryByRole("button", { name: "Generate Next Round" })).not.toBeInTheDocument();
+  });
+
+  it("shows the recommended round count", async () => {
+    server.use(
+      http.get("/pods/pod-1/rounds", () => HttpResponse.json([ROUND_1, ROUND_2])),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      http.get("/pods/pod-1/report", () =>
+        HttpResponse.json({
+          is_complete: false,
+          rounds_played: 2,
+          is_partial: false,
+          active_entry_count: 2,
+          recommended_rounds: 1,
+          standings: [],
+        }),
+      ),
+    );
+
+    renderPairings();
+
+    expect(await screen.findByText(/Recommended rounds: 1/)).toBeInTheDocument();
+  });
+
+  it("shows a banner when the recommended round count changes after generating a round", async () => {
+    let rounds: RoundRead[] = [ROUND_1];
+    let reportFetchCount = 0;
+    server.use(
+      http.get("/pods/pod-1/rounds", () => HttpResponse.json(rounds)),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+      http.post("/pods/pod-1/rounds", () => {
+        rounds = [...rounds, ROUND_2];
+        return HttpResponse.json(ROUND_2, { status: 201 });
+      }),
+      http.get("/pods/pod-1/report", () => {
+        reportFetchCount += 1;
+        const active = reportFetchCount === 1 ? 2 : 1;
+        return HttpResponse.json({
+          is_complete: false,
+          rounds_played: rounds.length,
+          is_partial: false,
+          active_entry_count: active,
+          recommended_rounds: active <= 1 ? 0 : 1,
+          standings: [],
+        });
+      }),
+    );
+
+    renderPairings();
+    await screen.findByText(/Recommended rounds: 1/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate Next Round" }));
+
+    expect(await screen.findByText(/Round target changed from 1 to 0/)).toBeInTheDocument();
   });
 });

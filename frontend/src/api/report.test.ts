@@ -11,6 +11,8 @@ describe("report api", () => {
       is_complete: false,
       rounds_played: 2,
       is_partial: true,
+      active_entry_count: 1,
+      recommended_rounds: 3,
       standings: [{ entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] }],
     });
 
@@ -20,6 +22,8 @@ describe("report api", () => {
       is_complete: false,
       rounds_played: 2,
       is_partial: true,
+      active_entry_count: 1,
+      recommended_rounds: 3,
       standings: [{ entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] }],
     });
     expect(apiFetch).toHaveBeenCalledWith("/pods/pod-1/report", undefined);

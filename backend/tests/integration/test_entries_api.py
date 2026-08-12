@@ -304,3 +304,69 @@ def test_duplicate_entry_submission_is_rejected(api_client, make_token):
     response = api_client.post("/entries", json=payload, headers=_auth_headers(token))
 
     assert response.status_code == 409
+
+
+def test_organizer_drops_entry(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_id = _create_entry(api_client, token, pod_id)
+
+    response = api_client.post(f"/entries/{entry_id}/drop", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json()["dropped_at_round"] == 0
+
+
+def test_dropping_already_dropped_entry_is_conflict(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_id = _create_entry(api_client, token, pod_id)
+    api_client.post(f"/entries/{entry_id}/drop", headers=_auth_headers(token))
+
+    response = api_client.post(f"/entries/{entry_id}/drop", headers=_auth_headers(token))
+
+    assert response.status_code == 409
+
+
+def test_non_organizer_cannot_drop_entry(api_client, make_token, db_session):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_id = _create_entry(api_client, token, pod_id)
+    reader_token = _add_pod_role_reader_token(db_session, make_token, pod_id)
+
+    response = api_client.post(f"/entries/{entry_id}/drop", headers=_auth_headers(reader_token))
+
+    assert response.status_code == 403
+
+
+def test_organizer_undrops_entry(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_id = _create_entry(api_client, token, pod_id)
+    api_client.post(f"/entries/{entry_id}/drop", headers=_auth_headers(token))
+
+    response = api_client.post(f"/entries/{entry_id}/undrop", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json()["dropped_at_round"] is None
+
+
+def test_undropping_non_dropped_entry_is_conflict(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_id = _create_entry(api_client, token, pod_id)
+
+    response = api_client.post(f"/entries/{entry_id}/undrop", headers=_auth_headers(token))
+
+    assert response.status_code == 409
+
+
+def test_dropping_entry_in_completed_pod_is_conflict(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token)
+    entry_id = _create_entry(api_client, token, pod_id)
+    api_client.post(f"/pods/{pod_id}/complete", headers=_auth_headers(token))
+
+    response = api_client.post(f"/entries/{entry_id}/drop", headers=_auth_headers(token))
+
+    assert response.status_code == 409

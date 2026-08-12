@@ -28,7 +28,7 @@ describe("EntryRoster", () => {
   it("lists entries by display name", async () => {
     server.use(http.get("/entries", () => HttpResponse.json([ASH])));
 
-    renderWithProviders(<EntryRoster podId="pod-1" />);
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
 
     expect(await screen.findByText("Ash")).toBeInTheDocument();
   });
@@ -48,7 +48,7 @@ describe("EntryRoster", () => {
       }),
     );
 
-    renderWithProviders(<EntryRoster podId="pod-1" />);
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
     await screen.findByText("No entries yet.");
 
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ash" } });
@@ -69,7 +69,7 @@ describe("EntryRoster", () => {
       }),
     );
 
-    renderWithProviders(<EntryRoster podId="pod-1" />);
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
     await screen.findByText("Ash");
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Ash" }));
@@ -89,7 +89,7 @@ describe("EntryRoster", () => {
       }),
     );
 
-    renderWithProviders(<EntryRoster podId="pod-1" />);
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
     await screen.findByText("Ash");
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Ash" }));
@@ -100,7 +100,7 @@ describe("EntryRoster", () => {
   it("hides mutation controls for a non-Organizer persona", async () => {
     server.use(http.get("/entries", () => HttpResponse.json([ASH])));
 
-    renderWithProviders(<EntryRoster podId="pod-1" />, { personaLabel: "Player" });
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />, { personaLabel: "Player" });
 
     await screen.findByText("Ash");
     expect(screen.queryByRole("button", { name: "Edit Ash" })).not.toBeInTheDocument();
@@ -111,7 +111,7 @@ describe("EntryRoster", () => {
   it("disambiguates Edit/Delete buttons by entry name across multiple rows", async () => {
     server.use(http.get("/entries", () => HttpResponse.json([ASH, MISTY])));
 
-    renderWithProviders(<EntryRoster podId="pod-1" />);
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
     await screen.findByText("Ash");
     await screen.findByText("Misty");
 
@@ -140,7 +140,7 @@ describe("EntryRoster", () => {
       }),
     );
 
-    renderWithProviders(<EntryRoster podId="pod-1" />);
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
     await screen.findByText("Ash");
 
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Brock" } });
@@ -154,6 +154,103 @@ describe("EntryRoster", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("drops an entry", async () => {
+    let dropped = false;
+    server.use(
+      http.get("/entries", () =>
+        HttpResponse.json([{ ...ASH, dropped_at_round: dropped ? 0 : null }]),
+      ),
+      http.post("/entries/e1/drop", () => {
+        dropped = true;
+        return HttpResponse.json({ ...ASH, dropped_at_round: 0 });
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Drop Ash" }));
+
+    expect(await screen.findByRole("button", { name: "Undrop Ash" })).toBeInTheDocument();
+  });
+
+  it("undrops an entry", async () => {
+    let dropped = true;
+    server.use(
+      http.get("/entries", () =>
+        HttpResponse.json([{ ...ASH, dropped_at_round: dropped ? 0 : null }]),
+      ),
+      http.post("/entries/e1/undrop", () => {
+        dropped = false;
+        return HttpResponse.json({ ...ASH, dropped_at_round: null });
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Undrop Ash" }));
+
+    expect(await screen.findByRole("button", { name: "Drop Ash" })).toBeInTheDocument();
+  });
+
+  it("clears a stale drop mutation error once a different action succeeds", async () => {
+    let entries = [{ ...ASH, dropped_at_round: null }];
+    server.use(
+      http.get("/entries", () => HttpResponse.json(entries)),
+      http.post("/entries/e1/drop", () => HttpResponse.json({ detail: "drop failed" }, { status: 500 })),
+      http.delete("/entries/e1", () => {
+        entries = [];
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
+    await screen.findByText("Ash");
+
+    fireEvent.click(screen.getByRole("button", { name: "Drop Ash" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("drop failed");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Ash" }));
+
+    await waitFor(() => expect(screen.queryByText("Ash")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("clears a stale undrop mutation error once a different entry is dropped", async () => {
+    server.use(
+      http.get("/entries", () =>
+        HttpResponse.json([
+          { ...ASH, dropped_at_round: 0 },
+          { ...MISTY, dropped_at_round: null },
+        ]),
+      ),
+      http.post("/entries/e1/undrop", () => HttpResponse.json({ detail: "undrop failed" }, { status: 500 })),
+      http.post("/entries/e2/drop", () => HttpResponse.json({ ...MISTY, dropped_at_round: 0 })),
+    );
+
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt={null} />);
+    await screen.findByText("Ash");
+    await screen.findByText("Misty");
+
+    fireEvent.click(screen.getByRole("button", { name: "Undrop Ash" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("undrop failed");
+
+    fireEvent.click(screen.getByRole("button", { name: "Drop Misty" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("hides drop/undrop buttons once the pod is complete", async () => {
+    server.use(http.get("/entries", () => HttpResponse.json([{ ...ASH, dropped_at_round: null }])));
+
+    renderWithProviders(<EntryRoster podId="pod-1" podCompletedAt="2026-08-11T00:00:00Z" />);
+
+    await screen.findByText("Ash");
+    expect(screen.queryByRole("button", { name: "Drop Ash" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undrop Ash" })).not.toBeInTheDocument();
+  });
+
   it("hides the edit row if the persona switches to non-Organizer mid-edit", async () => {
     // Regression test: EntryRoster keeps `editingId` as local component state,
     // which survives a persona switch (switching personas doesn't unmount the
@@ -165,7 +262,7 @@ describe("EntryRoster", () => {
     renderWithProviders(
       <>
         <PersonaSwitcher />
-        <EntryRoster podId="pod-1" />
+        <EntryRoster podId="pod-1" podCompletedAt={null} />
       </>,
       { personaLabel: "Organizer" },
     );
