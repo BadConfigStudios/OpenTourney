@@ -103,3 +103,58 @@ def test_add_member_to_unknown_organization_returns_404(api_client, make_token):
     )
 
     assert response.status_code == 404
+
+
+def test_add_duplicate_member_returns_409(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    payload = {
+        "player_uuid": str(uuid.uuid4()),
+        "source_system": "club-checkin",
+        "role": "organizer",
+    }
+
+    first_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json=payload,
+        headers=_auth_headers(owner_token),
+    )
+    assert first_response.status_code == 201
+
+    second_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json=payload,
+        headers=_auth_headers(owner_token),
+    )
+
+    assert second_response.status_code == 409
+
+
+def test_non_owner_member_cannot_add_member(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    organizer_uuid = uuid.uuid4()
+    add_organizer_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={
+            "player_uuid": str(organizer_uuid),
+            "source_system": "club-checkin",
+            "role": "organizer",
+        },
+        headers=_auth_headers(owner_token),
+    )
+    assert add_organizer_response.status_code == 201
+
+    organizer_token = make_token(player_uuid=organizer_uuid, roles=["organizer"])
+    response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "role": "organizer",
+        },
+        headers=_auth_headers(organizer_token),
+    )
+
+    assert response.status_code == 403
