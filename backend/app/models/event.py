@@ -9,7 +9,8 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class Event(Base, UUIDPrimaryKeyMixin, TimestampMixin):
-    """A single-day in-person tournament event, identified by its date.
+    """A single-day in-person tournament event, identified by its name and date,
+    and belonging to exactly one Organization.
 
     MVP1 restricts an Event to at most one Pod — see `Pod`'s
     `uq_pod_event` unique constraint.
