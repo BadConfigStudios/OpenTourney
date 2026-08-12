@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import (
     get_current_identity,
+    org_member_role,
     require_event_organizer,
     require_organizer_claim,
     visible_event_ids,
@@ -12,6 +13,7 @@ from app.auth.dependencies import (
 from app.auth.identity import Identity
 from app.db import get_db_session
 from app.models import Event, Pod
+from app.models.organization import OrgRoleName
 from app.models.rbac import EventOrganizer
 from app.routers.pods import delete_pod_children
 from app.schemas.event import EventCreate, EventRead, EventUpdate
@@ -25,7 +27,18 @@ def create_event(
     identity: Identity = Depends(require_organizer_claim),
     db: Session = Depends(get_db_session),
 ) -> Event:
-    event = Event(date=payload.date)
+    role = org_member_role(db, identity, payload.organization_id)
+    if role not in (OrgRoleName.OWNER, OrgRoleName.ORGANIZER):
+        raise HTTPException(
+            status_code=403, detail="Owner or Organizer role required for this organization"
+        )
+
+    event = Event(
+        date=payload.date,
+        name=payload.name,
+        description=payload.description,
+        organization_id=payload.organization_id,
+    )
     db.add(event)
     db.flush()
     db.add(
@@ -76,6 +89,8 @@ def update_event(
     if event is None:
         raise HTTPException(status_code=404, detail="event not found")
     event.date = payload.date
+    event.name = payload.name
+    event.description = payload.description
     db.commit()
     db.refresh(event)
     return event
