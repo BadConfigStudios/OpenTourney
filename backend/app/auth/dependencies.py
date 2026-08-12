@@ -10,7 +10,7 @@ from app.auth.oidc import AuthError, AuthServiceUnavailableError, decode_token
 from app.config import Settings, get_settings
 from app.db import get_db_session
 from app.models import Event
-from app.models.organization import OrganizationMember, OrgRoleName
+from app.models.organization import Organization, OrganizationMember, OrgRoleName
 from app.models.pod import Pod
 from app.models.rbac import EventOrganizer, PodRole, PodRoleName
 
@@ -80,6 +80,19 @@ def org_member_role(
         .first()
     )
     return member.role if member is not None else None
+
+
+def require_org_owner(
+    organization_id: uuid.UUID,
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
+) -> Identity:
+    org = db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="organization not found")
+    if org_member_role(db, identity, organization_id) != OrgRoleName.OWNER:
+        raise HTTPException(status_code=403, detail="Owner role required for this organization")
+    return identity
 
 
 def visible_event_ids(db: Session, identity: Identity) -> set[uuid.UUID]:

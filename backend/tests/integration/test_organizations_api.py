@@ -42,3 +42,64 @@ def test_list_organizations_only_shows_orgs_caller_belongs_to(api_client, make_t
     assert response.status_code == 200
     names = [org["name"] for org in response.json()]
     assert names == ["Mine"]
+
+
+def _create_org(api_client, token, name="Dragon's Den") -> str:
+    return api_client.post(
+        "/organizations", json={"name": name}, headers=_auth_headers(token)
+    ).json()["id"]
+
+
+def test_owner_adds_member(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    new_member_uuid = str(uuid.uuid4())
+
+    response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={
+            "player_uuid": new_member_uuid,
+            "source_system": "club-checkin",
+            "role": "organizer",
+        },
+        headers=_auth_headers(owner_token),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["player_uuid"] == new_member_uuid
+    assert body["role"] == "organizer"
+
+
+def test_non_owner_cannot_add_member(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    stranger_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "role": "organizer",
+        },
+        headers=_auth_headers(stranger_token),
+    )
+
+    assert response.status_code == 403
+
+
+def test_add_member_to_unknown_organization_returns_404(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.post(
+        f"/organizations/{uuid.uuid4()}/members",
+        json={
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "role": "organizer",
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 404
