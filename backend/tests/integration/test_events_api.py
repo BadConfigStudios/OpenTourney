@@ -1,5 +1,8 @@
 import uuid
 
+from app.models import Entry, Match, Pod, Round
+from app.models.rbac import PodRole, PodRoleName
+
 
 def _auth_headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
@@ -163,3 +166,91 @@ def test_list_events_only_shows_visible_events(api_client, make_token):
     assert response.status_code == 200
     dates = [event["date"] for event in response.json()]
     assert dates == ["2026-09-01"]
+
+
+def test_deleting_event_cascades_to_pods_entries_rounds_matches_and_roles(
+    api_client, make_token, db_session
+):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, token)
+    event_id = uuid.UUID(
+        api_client.post(
+            "/events",
+            json={"date": "2026-09-01", "name": "Friday Standard", "organization_id": org_id},
+            headers=_auth_headers(token),
+        ).json()["id"]
+    )
+
+    # Pods/Entries/Rounds/Matches/PodRoles have no dedicated endpoints on this branch yet
+    # (Task 8+), so insert them directly via the shared db_session — the api_client fixture
+    # overrides get_db_session to yield this same session, so the router sees these rows.
+    pod = Pod(event_id=event_id, format_slug="swiss", game_slug="generic")
+    db_session.add(pod)
+    db_session.flush()
+
+    entry = Entry(pod_id=pod.id, player_uuid=uuid.uuid4(), source_system="club-checkin")
+    db_session.add(entry)
+    db_session.flush()
+
+    round_ = Round(pod_id=pod.id, number=1)
+    db_session.add(round_)
+    db_session.flush()
+
+    match = Match(round_id=round_.id, entry1_id=entry.id)
+    db_session.add(match)
+
+    pod_role = PodRole(
+        pod_id=pod.id,
+        player_uuid=uuid.uuid4(),
+        source_system="club-checkin",
+        role=PodRoleName.SCOREKEEPER,
+    )
+    db_session.add(pod_role)
+    db_session.commit()
+
+    pod_id, entry_id, round_id, match_id, pod_role_id = (
+        pod.id,
+        entry.id,
+        round_.id,
+        match.id,
+        pod_role.id,
+    )
+
+    delete_response = api_client.delete(f"/events/{event_id}", headers=_auth_headers(token))
+    assert delete_response.status_code == 204
+
+    assert db_session.get(Pod, pod_id) is None
+    assert db_session.get(Entry, entry_id) is None
+    assert db_session.get(Round, round_id) is None
+    assert db_session.get(Match, match_id) is None
+    assert db_session.get(PodRole, pod_role_id) is None
+
+
+def test_event_organizer_of_one_event_cannot_write_to_another_event(api_client, make_token):
+    token_a = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_a_id = _create_org(api_client, token_a, name="Org A")
+    token_b = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_b_id = _create_org(api_client, token_b, name="Org B")
+
+    api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Event A", "organization_id": org_a_id},
+        headers=_auth_headers(token_a),
+    )
+    event_b_id = api_client.post(
+        "/events",
+        json={"date": "2026-09-05", "name": "Event B", "organization_id": org_b_id},
+        headers=_auth_headers(token_b),
+    ).json()["id"]
+
+    patch_response = api_client.patch(
+        f"/events/{event_b_id}",
+        json={"date": "2026-09-06", "name": "Event B (Moved)"},
+        headers=_auth_headers(token_a),
+    )
+    assert patch_response.status_code == 403
+
+    delete_response = api_client.delete(
+        f"/events/{event_b_id}", headers=_auth_headers(token_a)
+    )
+    assert delete_response.status_code == 403
