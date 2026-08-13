@@ -12,8 +12,8 @@ class EventCreate(BaseModel):
 
 
 class EventUpdate(BaseModel):
-    date: dt.date
-    name: str
+    date: dt.date | None = None
+    name: str | None = None
     description: str | None = None
 
 

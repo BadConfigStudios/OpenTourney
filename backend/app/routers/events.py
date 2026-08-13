@@ -88,9 +88,8 @@ def update_event(
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="event not found")
-    event.date = payload.date
-    event.name = payload.name
-    event.description = payload.description
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(event, field, value)
     db.commit()
     db.refresh(event)
     return event

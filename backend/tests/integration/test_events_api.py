@@ -103,6 +103,52 @@ def test_org_organizer_role_can_create_event(api_client, make_token):
     assert response.status_code == 201
 
 
+def test_org_scorekeeper_role_cannot_create_event(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    staff_uuid = str(uuid.uuid4())
+    api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "scorekeeper"},
+        headers=_auth_headers(owner_token),
+    )
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Friday Standard", "organization_id": org_id},
+        headers=_auth_headers(staff_token),
+    )
+
+    assert response.status_code == 403
+
+
+def test_org_judge_role_cannot_create_event(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    staff_uuid = str(uuid.uuid4())
+    api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "judge"},
+        headers=_auth_headers(owner_token),
+    )
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Friday Standard", "organization_id": org_id},
+        headers=_auth_headers(staff_token),
+    )
+
+    assert response.status_code == 403
+
+
 def test_unrelated_identity_cannot_read_event(api_client, make_token):
     creator_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     org_id = _create_org(api_client, creator_token)
@@ -142,6 +188,32 @@ def test_organizer_can_update_and_delete_own_event(api_client, make_token):
 
     get_response = api_client.get(f"/events/{event_id}", headers=_auth_headers(token))
     assert get_response.status_code == 404
+
+
+def test_patch_omitting_description_preserves_existing_description(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, token)
+    event_id = api_client.post(
+        "/events",
+        json={
+            "date": "2026-09-01",
+            "name": "Friday Standard",
+            "description": "Weekly league night",
+            "organization_id": org_id,
+        },
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    patch_response = api_client.patch(
+        f"/events/{event_id}",
+        json={"date": "2026-09-02"},
+        headers=_auth_headers(token),
+    )
+
+    assert patch_response.status_code == 200
+    assert patch_response.json()["date"] == "2026-09-02"
+    assert patch_response.json()["name"] == "Friday Standard"
+    assert patch_response.json()["description"] == "Weekly league night"
 
 
 def test_list_events_only_shows_visible_events(api_client, make_token):
@@ -219,6 +291,8 @@ def test_deleting_event_cascades_to_pods_entries_rounds_matches_and_roles(
     delete_response = api_client.delete(f"/events/{event_id}", headers=_auth_headers(token))
     assert delete_response.status_code == 204
 
+    # Safe because SQLAlchemy 2.0's synchronize_session="auto" evicts bulk-deleted rows from
+    # the identity map; a DB-level cascade would break this.
     assert db_session.get(Pod, pod_id) is None
     assert db_session.get(Entry, entry_id) is None
     assert db_session.get(Round, round_id) is None

@@ -177,9 +177,16 @@
       "EventUpdate": {
         "properties": {
           "date": {
-            "format": "date",
-            "title": "Date",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
           },
           "description": {
             "anyOf": [
@@ -193,14 +200,17 @@
             "title": "Description"
           },
           "name": {
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
-        "required": [
-          "date",
-          "name"
-        ],
         "title": "EventUpdate",
         "type": "object"
       },
