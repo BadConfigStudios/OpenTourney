@@ -17,9 +17,19 @@ from app.auth.dependencies import (
 from app.auth.identity import Identity
 from app.config import get_settings
 from app.db import get_db_session
-from app.models import Event, Pod
+from app.models import Event, Organization, Pod
 from app.models.rbac import EventOrganizer, PodRole, PodRoleName
 from tests.support.fake_jwks import FakeUnreachableJWKSProvider
+
+
+def _make_event(db_session, event_date: date = date(2026, 9, 1)) -> Event:
+    org = Organization(name="Test Org")
+    db_session.add(org)
+    db_session.flush()
+    event = Event(date=event_date, name="Test Event", organization_id=org.id)
+    db_session.add(event)
+    db_session.flush()
+    return event
 
 
 def _build_test_app() -> FastAPI:
@@ -129,9 +139,7 @@ def test_missing_organizer_claim_is_forbidden(db_session, test_settings, make_to
 
 
 def test_event_organizer_row_grants_access(db_session, test_settings, make_token):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     player_uuid = uuid.uuid4()
     db_session.add(
         EventOrganizer(event_id=event.id, player_uuid=player_uuid, source_system="club-checkin")
@@ -149,8 +157,7 @@ def test_event_organizer_row_grants_access(db_session, test_settings, make_token
 
 
 def test_no_event_organizer_row_is_forbidden(db_session, test_settings, make_token):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
+    event = _make_event(db_session)
     db_session.commit()
 
     client = _client(_build_test_app(), db_session, test_settings)
@@ -175,9 +182,7 @@ def test_nonexistent_event_is_not_found_for_event_organizer(db_session, test_set
 
 
 def test_event_organizer_row_grants_pod_organizer_access(db_session, test_settings, make_token):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.flush()
@@ -200,9 +205,7 @@ def test_event_organizer_row_grants_pod_organizer_access(db_session, test_settin
 def test_no_event_organizer_row_is_forbidden_for_pod_organizer(
     db_session, test_settings, make_token
 ):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.commit()
@@ -229,9 +232,7 @@ def test_nonexistent_pod_is_not_found_for_pod_organizer(db_session, test_setting
 
 
 def test_pod_role_grants_pod_access_without_organizer_row(db_session, test_settings, make_token):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.flush()
@@ -252,9 +253,7 @@ def test_pod_role_grants_pod_access_without_organizer_row(db_session, test_setti
 
 
 def test_no_role_at_all_is_forbidden_for_pod_access(db_session, test_settings, make_token):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.commit()
@@ -281,10 +280,8 @@ def test_nonexistent_pod_is_not_found_for_pod_access(db_session, test_settings, 
 
 
 def test_visible_event_ids_unions_organizer_and_pod_role_events(db_session):
-    event_a = Event(date=date(2026, 9, 1))
-    event_b = Event(date=date(2026, 9, 2))
-    db_session.add_all([event_a, event_b])
-    db_session.flush()
+    event_a = _make_event(db_session, event_date=date(2026, 9, 1))
+    event_b = _make_event(db_session, event_date=date(2026, 9, 2))
 
     player_uuid = uuid.uuid4()
     source_system = "club-checkin"
@@ -323,9 +320,7 @@ def test_visible_event_ids_returns_empty_set_when_no_roles(db_session):
 
 
 def test_pod_staff_allowed_true_for_event_organizer(db_session):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.flush()
@@ -340,9 +335,7 @@ def test_pod_staff_allowed_true_for_event_organizer(db_session):
 
 
 def test_pod_staff_allowed_true_for_scorekeeper(db_session):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.flush()
@@ -362,9 +355,7 @@ def test_pod_staff_allowed_true_for_scorekeeper(db_session):
 
 
 def test_pod_staff_allowed_false_for_plain_user_role(db_session):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.flush()

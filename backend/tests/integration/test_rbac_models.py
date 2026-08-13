@@ -5,12 +5,15 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DataError, IntegrityError
 
-from app.models import Event, Pod
+from app.models import Event, Organization, Pod
 from app.models.rbac import EventOrganizer, PodRole, PodRoleName
 
 
 def _make_event(db_session) -> Event:
-    event = Event(date=date(2026, 9, 1))
+    org = Organization(name="Test Org")
+    db_session.add(org)
+    db_session.flush()
+    event = Event(date=date(2026, 9, 1), name="Test Event", organization_id=org.id)
     db_session.add(event)
     db_session.flush()
     return event

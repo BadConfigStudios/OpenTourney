@@ -5,13 +5,21 @@ import pytest
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from app.models import Event, Pod
+from app.models import Event, Organization, Pod
+
+
+def _make_event(db_session) -> Event:
+    org = Organization(name="Test Org")
+    db_session.add(org)
+    db_session.flush()
+    event = Event(date=date(2026, 9, 1), name="Test Event", organization_id=org.id)
+    db_session.add(event)
+    db_session.flush()
+    return event
 
 
 def test_pod_persists_linked_to_event(db_session):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
 
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
@@ -30,9 +38,7 @@ def test_pod_requires_existing_event(db_session):
 
 
 def test_pod_event_id_is_unique_at_db_level(db_session):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
 
     db_session.add(Pod(event_id=event.id, format_slug="swiss", game_slug="generic"))
     db_session.commit()
@@ -47,9 +53,7 @@ def test_pod_event_id_is_unique_at_db_level(db_session):
 
 
 def test_pod_completed_at_defaults_to_none(db_session):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
 
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
@@ -59,9 +63,7 @@ def test_pod_completed_at_defaults_to_none(db_session):
 
 
 def test_pod_completed_at_can_be_set(db_session):
-    event = Event(date=date(2026, 9, 1))
-    db_session.add(event)
-    db_session.flush()
+    event = _make_event(db_session)
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.commit()
