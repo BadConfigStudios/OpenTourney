@@ -19,6 +19,7 @@ export function NewEvent() {
   const organizationsQuery = useQuery({
     queryKey: ["organizations"],
     queryFn: () => listOrganizations(apiFetch),
+    enabled: currentPersona.role === "organizer",
   });
 
   const createOrgMutation = useMutation({
@@ -46,6 +47,9 @@ export function NewEvent() {
     if (organizationId === "" && organizationsQuery.data && organizationsQuery.data.length > 0) {
       setOrganizationId(organizationsQuery.data[0].id);
     }
+    // Deliberately omitting `organizationId` from deps: the `organizationId === ""` guard
+    // means this can only fire once (the first time the list loads), and the empty option
+    // in the <select> below is disabled, so it's unreachable via user action anyway.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationsQuery.data]);
 
@@ -133,6 +137,10 @@ export function NewEvent() {
             >
               Create organization
             </button>
+            {/* Needed because in tests the GET /organizations mock is static, so the
+                newly-created org never appears in a refetched <select>; in production this
+                flashes briefly before the invalidated query refetches and the <select>
+                (with the new org selected) replaces this branch. */}
             {createOrgMutation.data && (
               <p className="mt-2 text-sm text-gray-700">{createOrgMutation.data.name}</p>
             )}
