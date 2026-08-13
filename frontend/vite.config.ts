@@ -25,6 +25,7 @@ export default defineConfig({
       "/pods": { target: "http://localhost:8000", bypass: bypassOnHtmlAccept },
       "/entries": { target: "http://localhost:8000", bypass: bypassOnHtmlAccept },
       "/matches": { target: "http://localhost:8000", bypass: bypassOnHtmlAccept },
+      "/organizations": { target: "http://localhost:8000", bypass: bypassOnHtmlAccept },
     },
   },
   test: {
