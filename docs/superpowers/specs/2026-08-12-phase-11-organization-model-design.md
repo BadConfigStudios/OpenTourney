@@ -59,9 +59,14 @@ to show players.
 - Any UI for managing org membership, editing roles, removing members, or
   editing/deleting an organization (phase 3).
 - Any distinct capability for the `JUDGE` role — it exists in the schema
-  and is returned/settable everywhere a role appears, but has zero
-  enforced difference from `ORGANIZER` right now. A future phase gives it
-  something to do (e.g. penalty issuance) once that feature exists.
+  and is returned/settable everywhere a role appears, but on
+  organization-membership endpoints (`POST /organizations/{id}/members`,
+  `GET /organizations`) it has zero enforced difference from `ORGANIZER`
+  right now. This does *not* extend to event creation: `POST /events`
+  requires `OWNER` or `ORGANIZER` specifically (see §3), so `JUDGE` (and
+  `SCOREKEEPER`) members are rejected with 403 there, same as any other
+  non-qualifying role. A future phase gives `JUDGE` something to do (e.g.
+  penalty issuance) once that feature exists.
 - Any org-level branding beyond a name (no address, contact info, logo,
   etc.) — YAGNI until a concrete need appears.
 

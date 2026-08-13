@@ -45,6 +45,21 @@ Match
    :members:
    :undoc-members:
 
+Organization
+------------
+
+.. autoclass:: app.models.organization.Organization
+   :members:
+   :undoc-members:
+
+.. autoclass:: app.models.organization.OrganizationMember
+   :members:
+   :undoc-members:
+
+.. autoclass:: app.models.organization.OrgRoleName
+   :members:
+   :undoc-members:
+
 RBAC
 ----
 
