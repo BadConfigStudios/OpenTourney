@@ -12,16 +12,16 @@ describe("EventList", () => {
     server.use(
       http.get("/events", () =>
         HttpResponse.json([
-          { id: "1", date: "2026-08-01" },
-          { id: "2", date: "2026-09-01" },
+          { id: "1", date: "2026-08-01", name: "Friday Standard", description: null, organization_id: "org-1" },
+          { id: "2", date: "2026-09-01", name: "Regional Qualifier", description: null, organization_id: "org-1" },
         ]),
       ),
     );
 
     renderWithProviders(<EventList />);
 
-    expect(await screen.findByRole("link", { name: "2026-08-01" })).toHaveAttribute("href", "/events/1");
-    expect(screen.getByRole("link", { name: "2026-09-01" })).toHaveAttribute("href", "/events/2");
+    expect(await screen.findByRole("link", { name: "Friday Standard" })).toHaveAttribute("href", "/events/1");
+    expect(screen.getByRole("link", { name: "Regional Qualifier" })).toHaveAttribute("href", "/events/2");
     // Default persona (personas[0] in public/config.json) is Organizer.
     expect(screen.getByRole("link", { name: "New Event" })).toHaveAttribute("href", "/events/new");
   });

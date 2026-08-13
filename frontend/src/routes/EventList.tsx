@@ -30,7 +30,7 @@ export function EventList() {
           {events.map((event) => (
             <li key={event.id} className="py-2">
               <Link to={`/events/${event.id}`} className="text-blue-700 hover:underline">
-                {event.date}
+                {event.name}
               </Link>
             </li>
           ))}

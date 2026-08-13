@@ -29,7 +29,10 @@ export function EventDetail() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold">Event {eventQuery.data ? eventQuery.data.date : "…"}</h2>
+      <h2 className="mb-4 text-lg font-semibold">
+        {eventQuery.data ? eventQuery.data.name : "…"}
+      </h2>
+      {eventQuery.data && <p className="mb-4 text-sm text-gray-600">{eventQuery.data.date}</p>}
       <ErrorBanner error={eventQuery.error ?? podsQuery.error ?? createPodMutation.error} />
 
       {podsQuery.data && !pod && (
