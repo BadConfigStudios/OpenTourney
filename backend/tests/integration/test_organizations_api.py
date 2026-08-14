@@ -189,6 +189,31 @@ def test_non_member_cannot_list_members(api_client, make_token):
     assert response.status_code == 403
 
 
+def test_scorekeeper_cannot_list_members(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    scorekeeper_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={
+            "player_uuid": scorekeeper_uuid,
+            "source_system": "club-checkin",
+            "role": "scorekeeper",
+        },
+        headers=_auth_headers(owner_token),
+    )
+    assert add_response.status_code == 201
+    scorekeeper_token = make_token(
+        player_uuid=uuid.UUID(scorekeeper_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.get(
+        f"/organizations/{org_id}/members", headers=_auth_headers(scorekeeper_token)
+    )
+
+    assert response.status_code == 403
+
+
 def test_list_members_404s_for_unknown_org(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
 

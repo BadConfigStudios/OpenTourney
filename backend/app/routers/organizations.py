@@ -100,8 +100,11 @@ def list_organization_members(
     org = db.get(Organization, organization_id)
     if org is None:
         raise HTTPException(status_code=404, detail="organization not found")
-    if org_member_role(db, identity, organization_id) is None:
-        raise HTTPException(status_code=403, detail="membership on this organization required")
+    role = org_member_role(db, identity, organization_id)
+    if role not in (OrgRoleName.OWNER, OrgRoleName.ORGANIZER):
+        raise HTTPException(
+            status_code=403, detail="organizer role required for this organization"
+        )
     return (
         db.query(OrganizationMember)
         .filter_by(organization_id=organization_id)
@@ -121,12 +124,18 @@ def revoke_organization_member(
     if member is None or member.organization_id != organization_id:
         raise HTTPException(status_code=404, detail="organization member not found")
     if member.role == OrgRoleName.OWNER:
-        owner_count = (
+        # Lock the OWNER rows for this org within this transaction so a
+        # concurrent revoke of a different OWNER member can't read the same
+        # pre-delete count and also pass the <= 1 check (TOCTOU race). The
+        # second transaction's own with_for_update() blocks until this one
+        # commits/rolls back, then re-reads post-commit state.
+        owner_rows = (
             db.query(OrganizationMember)
             .filter_by(organization_id=organization_id, role=OrgRoleName.OWNER)
-            .count()
+            .with_for_update()
+            .all()
         )
-        if owner_count <= 1:
+        if len(owner_rows) <= 1:
             raise HTTPException(
                 status_code=409, detail="cannot revoke the organization's only owner"
             )

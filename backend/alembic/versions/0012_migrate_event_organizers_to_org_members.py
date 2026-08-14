@@ -22,11 +22,53 @@ def upgrade() -> None:
             """
             INSERT INTO organization_members
                 (id, organization_id, player_uuid, source_system, role, created_at)
-            SELECT gen_random_uuid(), e.organization_id, eo.player_uuid, eo.source_system,
+            SELECT gen_random_uuid(), organization_id, player_uuid, source_system,
                    'organizer', now()
-            FROM event_organizers eo
-            JOIN events e ON e.id = eo.event_id
-            ON CONFLICT ON CONSTRAINT uq_org_member_identity DO NOTHING
+            FROM (
+                -- Dedup identities across multiple events in the same org
+                -- first: with ON CONFLICT DO UPDATE (unlike DO NOTHING),
+                -- Postgres errors ("cannot affect row a second time") if the
+                -- same conflict target appears more than once within one
+                -- INSERT command.
+                SELECT DISTINCT e.organization_id, eo.player_uuid, eo.source_system
+                FROM event_organizers eo
+                JOIN events e ON e.id = eo.event_id
+            ) legacy_organizers
+            ON CONFLICT ON CONSTRAINT uq_org_member_identity
+            DO UPDATE SET role = 'organizer'
+            WHERE organization_members.role NOT IN ('owner', 'organizer')
+            """
+        )
+    )
+    # Any org with zero OWNER rows after synthesis (e.g. 0011's placeholder
+    # "Unassigned" org, which never gets an OrganizationMember row) is
+    # permanently locked out of member management — both add and revoke are
+    # gated by require_org_owner, which needs an existing OWNER row, and no
+    # such row can ever be created once locked. Promote the earliest legacy
+    # organizer (by event_organizers.created_at, since every synthesized row
+    # above shares the same now() timestamp and can't be used for ordering)
+    # to OWNER for any such org.
+    conn.execute(
+        sa.text(
+            """
+            WITH candidate AS (
+                SELECT DISTINCT ON (e.organization_id) om.id AS member_id
+                FROM event_organizers eo
+                JOIN events e ON e.id = eo.event_id
+                JOIN organization_members om
+                    ON om.organization_id = e.organization_id
+                    AND om.player_uuid = eo.player_uuid
+                    AND om.source_system = eo.source_system
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM organization_members om2
+                    WHERE om2.organization_id = e.organization_id AND om2.role = 'owner'
+                )
+                ORDER BY e.organization_id, eo.created_at ASC
+            )
+            UPDATE organization_members
+            SET role = 'owner'
+            FROM candidate
+            WHERE organization_members.id = candidate.member_id
             """
         )
     )
