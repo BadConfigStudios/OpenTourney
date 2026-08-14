@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from app.auth.jwks import build_jwks_provider
 from app.config import get_settings
-from app.routers import entries, events, matches, pod_roles, pods, rounds
+from app.routers import entries, events, matches, organizations, pod_roles, pods, rounds
 
 
 @asynccontextmanager
@@ -27,6 +27,7 @@ app.include_router(entries.router)
 app.include_router(pod_roles.router)
 app.include_router(rounds.router)
 app.include_router(matches.router)
+app.include_router(organizations.router)
 
 
 @app.get("/healthz")

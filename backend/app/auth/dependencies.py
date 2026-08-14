@@ -10,6 +10,7 @@ from app.auth.oidc import AuthError, AuthServiceUnavailableError, decode_token
 from app.config import Settings, get_settings
 from app.db import get_db_session
 from app.models import Event
+from app.models.organization import Organization, OrganizationMember, OrgRoleName
 from app.models.pod import Pod
 from app.models.rbac import EventOrganizer, PodRole, PodRoleName
 
@@ -64,6 +65,38 @@ def pod_role_exists(db: Session, identity: Identity, pod_id: uuid.UUID) -> bool:
         .first()
         is not None
     )
+
+
+def org_member_role(
+    db: Session, identity: Identity, organization_id: uuid.UUID
+) -> OrgRoleName | None:
+    member = (
+        db.query(OrganizationMember)
+        .filter_by(
+            organization_id=organization_id,
+            player_uuid=identity.player_uuid,
+            source_system=identity.source_system,
+        )
+        .first()
+    )
+    return member.role if member is not None else None
+
+
+# Intentionally does not also require identity.has_organizer_claim (unlike
+# require_organizer_claim, used by POST /organizations). Once granted org
+# membership, org-level role is the authority for org-scoped actions like
+# adding members — independent of the JWT's coarser `organizer` claim.
+def require_org_owner(
+    organization_id: uuid.UUID,
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
+) -> Identity:
+    org = db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="organization not found")
+    if org_member_role(db, identity, organization_id) != OrgRoleName.OWNER:
+        raise HTTPException(status_code=403, detail="Owner role required for this organization")
+    return identity
 
 
 def visible_event_ids(db: Session, identity: Identity) -> set[uuid.UUID]:

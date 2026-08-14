@@ -101,10 +101,32 @@
             "format": "date",
             "title": "Date",
             "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "organization_id": {
+            "format": "uuid",
+            "title": "Organization Id",
+            "type": "string"
           }
         },
         "required": [
-          "date"
+          "date",
+          "name",
+          "organization_id"
         ],
         "title": "EventCreate",
         "type": "object"
@@ -116,15 +138,38 @@
             "title": "Date",
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "organization_id": {
+            "format": "uuid",
+            "title": "Organization Id",
             "type": "string"
           }
         },
         "required": [
           "id",
-          "date"
+          "date",
+          "name",
+          "description",
+          "organization_id"
         ],
         "title": "EventRead",
         "type": "object"
@@ -132,14 +177,40 @@
       "EventUpdate": {
         "properties": {
           "date": {
-            "format": "date",
-            "title": "Date",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
-        "required": [
-          "date"
-        ],
         "title": "EventUpdate",
         "type": "object"
       },
@@ -273,6 +344,107 @@
           "result"
         ],
         "title": "MatchResultUpdate",
+        "type": "object"
+      },
+      "OrgRoleName": {
+        "description": "Roles grantable within an Organization. `JUDGE` has no enforced\ncapability difference from `ORGANIZER` yet \u2014 reserved for a future\nphase (e.g. penalty issuance) once that feature exists.",
+        "enum": [
+          "owner",
+          "organizer",
+          "scorekeeper",
+          "judge"
+        ],
+        "title": "OrgRoleName",
+        "type": "string"
+      },
+      "OrganizationCreate": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OrganizationCreate",
+        "type": "object"
+      },
+      "OrganizationMemberCreate": {
+        "properties": {
+          "player_uuid": {
+            "format": "uuid",
+            "title": "Player Uuid",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRoleName"
+          },
+          "source_system": {
+            "title": "Source System",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_uuid",
+          "source_system",
+          "role"
+        ],
+        "title": "OrganizationMemberCreate",
+        "type": "object"
+      },
+      "OrganizationMemberRead": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "organization_id": {
+            "format": "uuid",
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "player_uuid": {
+            "format": "uuid",
+            "title": "Player Uuid",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRoleName"
+          },
+          "source_system": {
+            "title": "Source System",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "player_uuid",
+          "source_system",
+          "role"
+        ],
+        "title": "OrganizationMemberRead",
+        "type": "object"
+      },
+      "OrganizationRead": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "OrganizationRead",
         "type": "object"
       },
       "PodCreate": {
@@ -1216,6 +1388,138 @@
         "summary": "Report Match Result",
         "tags": [
           "matches"
+        ]
+      }
+    },
+    "/organizations": {
+      "get": {
+        "operationId": "list_organizations_organizations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationRead"
+                  },
+                  "title": "Response List Organizations Organizations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Organizations",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "post": {
+        "operationId": "create_organization_organizations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{organization_id}/members": {
+      "post": {
+        "operationId": "add_organization_member_organizations__organization_id__members_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationMemberCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Organization Member",
+        "tags": [
+          "organizations"
         ]
       }
     },

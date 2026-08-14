@@ -9,8 +9,13 @@ def _auth_headers(token: str) -> dict:
 
 
 def _create_pod(api_client, token) -> str:
+    org_id = api_client.post(
+        "/organizations", json={"name": "Test Org"}, headers=_auth_headers(token)
+    ).json()["id"]
     event_id = api_client.post(
-        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+        "/events",
+        json={"date": "2026-09-01", "name": "Test Event", "organization_id": org_id},
+        headers=_auth_headers(token),
     ).json()["id"]
     return api_client.post(
         "/pods",
@@ -90,8 +95,13 @@ def test_pod_creation_rejects_unknown_game_slug_with_422_not_500(api_client, mak
     # is rejected at pod creation. This test ensures the registry lookup is validated
     # cleanly as a 422, not an unhandled ValueError -> 500.
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = api_client.post(
+        "/organizations", json={"name": "Test Org"}, headers=_auth_headers(token)
+    ).json()["id"]
     event_id = api_client.post(
-        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+        "/events",
+        json={"date": "2026-09-01", "name": "Test Event", "organization_id": org_id},
+        headers=_auth_headers(token),
     ).json()["id"]
 
     # Pod creation with unknown game slug now rejects with 422
@@ -113,8 +123,13 @@ def test_entry_creation_rejects_pod_with_unregistered_game_slug_with_422_not_500
     # is the safety net for that case, so bypass the router-level pod validation by
     # inserting the Pod row directly with an intentionally-unregistered game_slug.
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = api_client.post(
+        "/organizations", json={"name": "Test Org"}, headers=_auth_headers(token)
+    ).json()["id"]
     event_id = api_client.post(
-        "/events", json={"date": "2026-09-01"}, headers=_auth_headers(token)
+        "/events",
+        json={"date": "2026-09-01", "name": "Test Event", "organization_id": org_id},
+        headers=_auth_headers(token),
     ).json()["id"]
 
     pod = Pod(event_id=uuid.UUID(event_id), format_slug="swiss", game_slug="pokemon-tcg")

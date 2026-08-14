@@ -4,11 +4,14 @@ from datetime import date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.models import Entry, Event, Match, MatchResult, Pod, Round
+from app.models import Entry, Event, Match, MatchResult, Organization, Pod, Round
 
 
 def _make_pod_with_two_entries(db_session) -> tuple[Pod, Entry, Entry]:
-    event = Event(date=date(2026, 9, 1))
+    org = Organization(name="Test Org")
+    db_session.add(org)
+    db_session.flush()
+    event = Event(date=date(2026, 9, 1), name="Test Event", organization_id=org.id)
     db_session.add(event)
     db_session.flush()
     pod = Pod(event_id=event.id, format_slug="swiss", game_slug="generic")

@@ -5,7 +5,7 @@ import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { EventDetail } from "./EventDetail";
 
-const EVENT = { id: "event-1", date: "2026-08-01" };
+const EVENT = { id: "event-1", date: "2026-08-01", name: "Friday Standard", description: null, organization_id: "org-1" };
 const POD = { id: "pod-1", event_id: "event-1", format_slug: "swiss", game_slug: "generic", completed_at: null };
 
 function renderDetail(personaLabel?: string) {

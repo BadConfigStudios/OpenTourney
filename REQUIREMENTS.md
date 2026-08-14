@@ -56,10 +56,13 @@ behind each decision reflected here.
 
 | ID | Requirement | Serves | Phase |
 |----|-------------|--------|-------|
-| FR27 | Pokémon `GameModule` — descriptive only, no rules enforcement (per README's design principle): Bo1-by-default reporting (Bo1 is explicit organizer discretion per the official Play! Pokémon Tournament Rules Handbook §5.5.6), match-point constants matching MVP1's existing defaults (Win=3, Tie=1, Loss=0 — identical to the handbook's §5.3.2), and a `decklist_url` convention in `Entry.metadata_` (plain link to an externally-hosted public decklist, e.g. Limitless — no OpenTourney-hosted decklist builder/validator) | BR1, BR4 | 11 |
-| FR28 | Pokémon tiebreak strategy: Op Win% / Op Op Win% chain per the handbook §5.3.3 — 25% floor (not MTG's 33%), 100% max win% for completed entries vs. 75% max for dropped entries (depends on FR24's drop tracking), bye rounds excluded from a competitor's own win% when that competitor is later used as someone else's Op Win% input (§5.3.3.1) — a different bye nuance than FR25's bye-floor treatment | BR1, BR4 | 12 |
-| FR29 | Head-to-head as a third tiebreaker level (handbook §5.5.1.1's final tiebreaker before random/last-resort ordering) — extends the pluggable `TiebreakStrategy` interface (FR25) to support a pairwise fallback comparison, consumed by FR28's Pokémon strategy | BR1, BR4 | 12 |
-| FR30 | Real login flow: OIDC Authorization Code flow (Google) in the operational UI for prod, config-selectable per deployment alongside the existing persona-switcher (FR26, kept for staging/dev) — no new backend auth code required, `RemoteJWKSProvider` (`backend/app/auth/jwks.py`) already supports a real remote issuer, this is frontend + prod config | BR1 | 13 |
+| FR27 | Pokémon `GameModule` — descriptive only, no rules enforcement (per README's design principle): Bo1-by-default reporting (Bo1 is explicit organizer discretion per the official Play! Pokémon Tournament Rules Handbook §5.5.6), match-point constants matching MVP1's existing defaults (Win=3, Tie=1, Loss=0 — identical to the handbook's §5.3.2), and a `decklist_url` convention in `Entry.metadata_` (plain link to an externally-hosted public decklist, e.g. Limitless — no OpenTourney-hosted decklist builder/validator) | BR1, BR4 | 14 |
+| FR28 | Pokémon tiebreak strategy: Op Win% / Op Op Win% chain per the handbook §5.3.3 — 25% floor (not MTG's 33%), 100% max win% for completed entries vs. 75% max for dropped entries (depends on FR24's drop tracking), bye rounds excluded from a competitor's own win% when that competitor is later used as someone else's Op Win% input (§5.3.3.1) — a different bye nuance than FR25's bye-floor treatment | BR1, BR4 | 15 |
+| FR29 | Head-to-head as a third tiebreaker level (handbook §5.5.1.1's final tiebreaker before random/last-resort ordering) — extends the pluggable `TiebreakStrategy` interface (FR25) to support a pairwise fallback comparison, consumed by FR28's Pokémon strategy | BR1, BR4 | 15 |
+| FR30 | Real login flow: OIDC Authorization Code flow (Google) in the operational UI for prod, config-selectable per deployment alongside the existing persona-switcher (FR26, kept for staging/dev) — no new backend auth code required, `RemoteJWKSProvider` (`backend/app/auth/jwks.py`) already supports a real remote issuer, this is frontend + prod config | BR1 | 16 |
+| FR31 | `Organization`/`OrganizationMember` data model (roles: owner/organizer/scorekeeper/judge — judge has no enforced capability yet), `Event` gains `name`/`description`/`organization_id` (required), minimal org CRUD API (create org, list caller's orgs, add member); `POST /events` requires org `OWNER`/`ORGANIZER` membership, `EventOrganizer` still dual-written so no other router changes | BR1, BR3 | 11 |
+| FR32 | RBAC cutover: replace `EventOrganizer`-based authorization across every operational router (pods, entries, rounds, matches) with org-membership resolution; retire `EventOrganizer` | BR1, BR3 | 12 |
+| FR33 | Operational UI: organization creation/membership/role management (full UI beyond Phase 11's `NewEvent.tsx` create-inline stopgap) | BR1 | 13 |
 
 ## Non-Functional Requirements (NFR)
 
@@ -110,7 +113,7 @@ to an MVP/phase yet.
 
 ### MVP2 — Pokémon Live Launch (target `v0.2.0`)
 
-Serves BR1, BR4 / FR24, FR27–FR30. Phases 10–14.
+Serves BR1, BR4 / FR24, FR27–FR33. Phases 10–17.
 
 **Acceptance**: An Organizer can run a real single-phase Swiss Bo1
 Pokémon TCG event with real players authenticated via Google — pairings
@@ -145,8 +148,11 @@ manifests belong in `OpenTourney` itself.
 | 7 | Operational UI (setup, pairings, scoring, final report, persona switcher) | MVP1 |
 | 8 | Swiss real tiebreakers (OMW%/OOMW% behind a pluggable tiebreak-calculation interface, replacing the UUID tiebreak in pairing + final report) | MVP1 |
 | 9 | MVP1 verification (full suite, staging verification, versioned docs site, release cut `v0.1.0`) | MVP1 — done |
-| 10 | Entry drop tracking + dynamic Swiss round-target recompute (FR24) | MVP2 |
-| 11 | Pokémon `GameModule` (Bo1 defaults, match-point constants, `decklist_url` convention) (FR27) | MVP2 |
-| 12 | Pokémon tiebreak strategy (Op Win%/Op Op Win%, 25% floor, dropped-entry handling) + head-to-head tiebreaker fallback (FR28, FR29) | MVP2 |
-| 13 | Real login flow: Google OIDC Authorization Code in the operational UI, config-selectable alongside the persona-switcher (FR30) | MVP2 |
-| 14 | MVP2 verification + release cut (`v0.2.0`) | MVP2 |
+| 10 | Entry drop tracking + dynamic Swiss round-target recompute (FR24) | MVP2 — done |
+| 11 | Organization data model (`Organization`/`OrganizationMember`, `Event.name`/`description`/`organization_id`, minimal org CRUD, `NewEvent.tsx` stopgap) (FR31) | MVP2 |
+| 12 | RBAC cutover: replace `EventOrganizer` with org-membership resolution across all operational routers; retire `EventOrganizer` (FR32) | MVP2 |
+| 13 | Operational UI: full organization membership/role management (FR33) | MVP2 |
+| 14 | Pokémon `GameModule` (Bo1 defaults, match-point constants, `decklist_url` convention) (FR27) | MVP2 |
+| 15 | Pokémon tiebreak strategy (Op Win%/Op Op Win%, 25% floor, dropped-entry handling) + head-to-head tiebreaker fallback (FR28, FR29) | MVP2 |
+| 16 | Real login flow: Google OIDC Authorization Code in the operational UI, config-selectable alongside the persona-switcher (FR30) | MVP2 |
+| 17 | MVP2 verification + release cut (`v0.2.0`) | MVP2 |

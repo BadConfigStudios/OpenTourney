@@ -36,17 +36,29 @@ Export the result for the examples below:
 Golden path
 -----------
 
-1. **Create an Event** (organizer-only):
+1. **Create an Organization** (Phase 11: Events belong to an
+   Organization, and the creator becomes its ``OWNER``):
+
+   .. code-block:: bash
+
+      curl -X POST http://localhost:8000/organizations \
+        -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+        -d '{"name": "Friday Night League"}'
+
+   Returns an ``OrganizationRead`` — note its ``id``.
+
+2. **Create an Event** (caller must be ``OWNER`` or ``ORGANIZER`` on the
+   organization):
 
    .. code-block:: bash
 
       curl -X POST http://localhost:8000/events \
         -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-        -d '{"date": "2026-08-08"}'
+        -d '{"date": "2026-08-08", "name": "Friday Standard", "organization_id": "<organization-id>"}'
 
    Returns an ``EventRead`` — note its ``id``.
 
-2. **Create a Pod** within that event (MVP1: one pod per event, Swiss
+3. **Create a Pod** within that event (MVP1: one pod per event, Swiss
    format, generic game module):
 
    .. code-block:: bash
@@ -55,7 +67,7 @@ Golden path
         -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
         -d '{"event_id": "<event-id>", "format_slug": "swiss", "game_slug": "generic"}'
 
-3. **Add Entries** (one per player):
+4. **Add Entries** (one per player):
 
    .. code-block:: bash
 
@@ -63,7 +75,7 @@ Golden path
         -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
         -d '{"pod_id": "<pod-id>", "player_uuid": "<uuid>", "source_system": "manual-verification"}'
 
-4. **Generate Round 1** (organizer-only; pairs all current entries):
+5. **Generate Round 1** (organizer-only; pairs all current entries):
 
    .. code-block:: bash
 
@@ -73,7 +85,7 @@ Golden path
    Returns a ``RoundRead`` with its ``matches`` — a bye match has
    ``entry2_id: null`` and needs no result.
 
-5. **Report a match result** (Organizer or Scorekeeper):
+6. **Report a match result** (Organizer or Scorekeeper):
 
    .. code-block:: bash
 
@@ -83,11 +95,11 @@ Golden path
 
    ``result`` is one of ``entry1_win``, ``entry2_win``, ``tie``.
 
-6. **Generate subsequent rounds** by repeating step 4 — pairings are
+7. **Generate subsequent rounds** by repeating step 5 — pairings are
    computed from current standings, including OMW%/OOMW% tiebreakers
    (FR25).
 
-7. **Pull the final report** once every match in the pod is resolved:
+8. **Pull the final report** once every match in the pod is resolved:
 
    .. code-block:: bash
 
