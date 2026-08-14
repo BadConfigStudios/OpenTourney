@@ -82,6 +82,10 @@ def org_member_role(
     return member.role if member is not None else None
 
 
+# Intentionally does not also require identity.has_organizer_claim (unlike
+# require_organizer_claim, used by POST /organizations). Once granted org
+# membership, org-level role is the authority for org-scoped actions like
+# adding members — independent of the JWT's coarser `organizer` claim.
 def require_org_owner(
     organization_id: uuid.UUID,
     identity: Identity = Depends(get_current_identity),
