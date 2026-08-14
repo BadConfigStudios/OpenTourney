@@ -371,11 +371,12 @@ def test_org_owner_can_operate_on_event_created_by_org_organizer(api_client, mak
     org_id = _create_org(api_client, owner_token)
 
     staff_uuid = str(uuid.uuid4())
-    api_client.post(
+    add_member_response = api_client.post(
         f"/organizations/{org_id}/members",
         json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
         headers=_auth_headers(owner_token),
     )
+    assert add_member_response.status_code == 201
     staff_token = make_token(
         player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
     )
@@ -395,6 +396,9 @@ def test_org_owner_can_operate_on_event_created_by_org_organizer(api_client, mak
     assert patch_response.status_code == 200
     assert patch_response.json()["name"] == "Renamed by Owner"
 
+    delete_response = api_client.delete(f"/events/{event_id}", headers=_auth_headers(owner_token))
+    assert delete_response.status_code == 204
+
 
 def test_org_organizer_can_operate_on_event_created_by_org_owner(api_client, make_token):
     owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
@@ -407,11 +411,12 @@ def test_org_organizer_can_operate_on_event_created_by_org_owner(api_client, mak
     event_id = create_response.json()["id"]
 
     staff_uuid = str(uuid.uuid4())
-    api_client.post(
+    add_member_response = api_client.post(
         f"/organizations/{org_id}/members",
         json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
         headers=_auth_headers(owner_token),
     )
+    assert add_member_response.status_code == 201
     staff_token = make_token(
         player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
     )
@@ -424,3 +429,6 @@ def test_org_organizer_can_operate_on_event_created_by_org_owner(api_client, mak
     assert get_response.status_code == 200
     assert patch_response.status_code == 200
     assert patch_response.json()["name"] == "Renamed by Organizer"
+
+    delete_response = api_client.delete(f"/events/{event_id}", headers=_auth_headers(staff_token))
+    assert delete_response.status_code == 204

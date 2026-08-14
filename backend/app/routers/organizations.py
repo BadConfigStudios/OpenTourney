@@ -120,5 +120,15 @@ def revoke_organization_member(
     member = db.get(OrganizationMember, member_id)
     if member is None or member.organization_id != organization_id:
         raise HTTPException(status_code=404, detail="organization member not found")
+    if member.role == OrgRoleName.OWNER:
+        owner_count = (
+            db.query(OrganizationMember)
+            .filter_by(organization_id=organization_id, role=OrgRoleName.OWNER)
+            .count()
+        )
+        if owner_count <= 1:
+            raise HTTPException(
+                status_code=409, detail="cannot revoke the organization's only owner"
+            )
     db.delete(member)
     db.commit()

@@ -63,10 +63,6 @@ Organization
 RBAC
 ----
 
-.. autoclass:: app.models.rbac.EventOrganizer
-   :members:
-   :undoc-members:
-
 .. autoclass:: app.models.rbac.PodRole
    :members:
    :undoc-members:
