@@ -88,7 +88,18 @@ def update_event(
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="event not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    # date/name are backed by NOT NULL columns; only description may be explicitly
+    # nulled via PATCH. Without this check, an explicit `null` passes
+    # Pydantic (the field IS set) and slips through to setattr below, which
+    # then throws an uncaught IntegrityError at commit time.
+    for field in ("date", "name"):
+        if field in updates and updates[field] is None:
+            raise HTTPException(status_code=422, detail=f"{field} cannot be null")
+    # EventUpdate's field set (date, name, description) IS the whitelist for
+    # what this loop may PATCH — anything added to that schema becomes
+    # silently PATCH-able here, so new fields need deliberate consideration.
+    for field, value in updates.items():
         setattr(event, field, value)
     db.commit()
     db.refresh(event)

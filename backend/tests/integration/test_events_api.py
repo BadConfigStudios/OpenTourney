@@ -216,6 +216,42 @@ def test_patch_omitting_description_preserves_existing_description(api_client, m
     assert patch_response.json()["description"] == "Weekly league night"
 
 
+def test_patch_rejects_explicit_null_date(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, token)
+    event_id = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Friday Standard", "organization_id": org_id},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    patch_response = api_client.patch(
+        f"/events/{event_id}",
+        json={"date": None},
+        headers=_auth_headers(token),
+    )
+
+    assert patch_response.status_code == 422
+
+
+def test_patch_rejects_explicit_null_name(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, token)
+    event_id = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Friday Standard", "organization_id": org_id},
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    patch_response = api_client.patch(
+        f"/events/{event_id}",
+        json={"name": None},
+        headers=_auth_headers(token),
+    )
+
+    assert patch_response.status_code == 422
+
+
 def test_list_events_only_shows_visible_events(api_client, make_token):
     mine_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     mine_org_id = _create_org(api_client, mine_token, name="Mine Org")
