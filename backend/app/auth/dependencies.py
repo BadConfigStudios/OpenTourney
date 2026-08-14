@@ -12,7 +12,7 @@ from app.db import get_db_session
 from app.models import Event
 from app.models.organization import Organization, OrganizationMember, OrgRoleName
 from app.models.pod import Pod
-from app.models.rbac import EventOrganizer, PodRole, PodRoleName
+from app.models.rbac import PodRole, PodRoleName
 
 _bearer_scheme = HTTPBearer()
 
@@ -42,16 +42,11 @@ def require_organizer_claim(identity: Identity = Depends(get_current_identity)) 
 
 
 def event_organizer_exists(db: Session, identity: Identity, event_id: uuid.UUID) -> bool:
-    return (
-        db.query(EventOrganizer)
-        .filter_by(
-            event_id=event_id,
-            player_uuid=identity.player_uuid,
-            source_system=identity.source_system,
-        )
-        .first()
-        is not None
-    )
+    event = db.get(Event, event_id)
+    if event is None:
+        return False
+    role = org_member_role(db, identity, event.organization_id)
+    return role in (OrgRoleName.OWNER, OrgRoleName.ORGANIZER)
 
 
 def pod_role_exists(db: Session, identity: Identity, pod_id: uuid.UUID) -> bool:
@@ -100,12 +95,16 @@ def require_org_owner(
 
 
 def visible_event_ids(db: Session, identity: Identity) -> set[uuid.UUID]:
-    organizer_ids = {
-        row.event_id
-        for row in db.query(EventOrganizer.event_id).filter_by(
-            player_uuid=identity.player_uuid, source_system=identity.source_system
+    org_role_rows = (
+        db.query(Event.id)
+        .join(OrganizationMember, OrganizationMember.organization_id == Event.organization_id)
+        .filter(
+            OrganizationMember.player_uuid == identity.player_uuid,
+            OrganizationMember.source_system == identity.source_system,
+            OrganizationMember.role.in_((OrgRoleName.OWNER, OrgRoleName.ORGANIZER)),
         )
-    }
+    )
+    org_event_ids = {row.id for row in org_role_rows}
     pod_ids = {
         row.pod_id
         for row in db.query(PodRole.pod_id).filter_by(
@@ -117,7 +116,7 @@ def visible_event_ids(db: Session, identity: Identity) -> set[uuid.UUID]:
         if pod_ids
         else set()
     )
-    return organizer_ids | pod_event_ids
+    return org_event_ids | pod_event_ids
 
 
 def require_event_organizer(

@@ -18,7 +18,8 @@ from app.auth.identity import Identity
 from app.config import get_settings
 from app.db import get_db_session
 from app.models import Event, Organization, Pod
-from app.models.rbac import EventOrganizer, PodRole, PodRoleName
+from app.models.organization import OrganizationMember, OrgRoleName
+from app.models.rbac import PodRole, PodRoleName
 from tests.support.fake_jwks import FakeUnreachableJWKSProvider
 
 
@@ -142,7 +143,12 @@ def test_event_organizer_row_grants_access(db_session, test_settings, make_token
     event = _make_event(db_session)
     player_uuid = uuid.uuid4()
     db_session.add(
-        EventOrganizer(event_id=event.id, player_uuid=player_uuid, source_system="club-checkin")
+        OrganizationMember(
+            organization_id=event.organization_id,
+            player_uuid=player_uuid,
+            source_system="club-checkin",
+            role=OrgRoleName.ORGANIZER,
+        )
     )
     db_session.commit()
 
@@ -188,7 +194,12 @@ def test_event_organizer_row_grants_pod_organizer_access(db_session, test_settin
     db_session.flush()
     player_uuid = uuid.uuid4()
     db_session.add(
-        EventOrganizer(event_id=event.id, player_uuid=player_uuid, source_system="club-checkin")
+        OrganizationMember(
+            organization_id=event.organization_id,
+            player_uuid=player_uuid,
+            source_system="club-checkin",
+            role=OrgRoleName.ORGANIZER,
+        )
     )
     db_session.commit()
 
@@ -288,10 +299,15 @@ def test_visible_event_ids_unions_organizer_and_pod_role_events(db_session):
 
     # Organizer on event A.
     db_session.add(
-        EventOrganizer(event_id=event_a.id, player_uuid=player_uuid, source_system=source_system)
+        OrganizationMember(
+            organization_id=event_a.organization_id,
+            player_uuid=player_uuid,
+            source_system=source_system,
+            role=OrgRoleName.ORGANIZER,
+        )
     )
 
-    # Pod role on a pod belonging to event B (no EventOrganizer row for B).
+    # Pod role on a pod belonging to event B (no org membership on B's org for this identity).
     pod = Pod(event_id=event_b.id, format_slug="swiss", game_slug="generic")
     db_session.add(pod)
     db_session.flush()
@@ -326,7 +342,12 @@ def test_pod_staff_allowed_true_for_event_organizer(db_session):
     db_session.flush()
     player_uuid = uuid.uuid4()
     db_session.add(
-        EventOrganizer(event_id=event.id, player_uuid=player_uuid, source_system="club-checkin")
+        OrganizationMember(
+            organization_id=event.organization_id,
+            player_uuid=player_uuid,
+            source_system="club-checkin",
+            role=OrgRoleName.ORGANIZER,
+        )
     )
     db_session.commit()
     identity = Identity(player_uuid=player_uuid, source_system="club-checkin", has_organizer_claim=False)

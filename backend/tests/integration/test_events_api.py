@@ -364,3 +364,71 @@ def test_event_organizer_of_one_event_cannot_write_to_another_event(api_client, 
         f"/events/{event_b_id}", headers=_auth_headers(token_a)
     )
     assert delete_response.status_code == 403
+
+
+def test_org_owner_can_operate_on_event_created_by_org_organizer(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    staff_uuid = str(uuid.uuid4())
+    add_member_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    assert add_member_response.status_code == 201
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+    create_response = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Staff-Created Event", "organization_id": org_id},
+        headers=_auth_headers(staff_token),
+    )
+    event_id = create_response.json()["id"]
+
+    get_response = api_client.get(f"/events/{event_id}", headers=_auth_headers(owner_token))
+    patch_response = api_client.patch(
+        f"/events/{event_id}", json={"name": "Renamed by Owner"}, headers=_auth_headers(owner_token)
+    )
+
+    assert get_response.status_code == 200
+    assert patch_response.status_code == 200
+    assert patch_response.json()["name"] == "Renamed by Owner"
+
+    delete_response = api_client.delete(f"/events/{event_id}", headers=_auth_headers(owner_token))
+    assert delete_response.status_code == 204
+
+
+def test_org_organizer_can_operate_on_event_created_by_org_owner(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    create_response = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Owner-Created Event", "organization_id": org_id},
+        headers=_auth_headers(owner_token),
+    )
+    event_id = create_response.json()["id"]
+
+    staff_uuid = str(uuid.uuid4())
+    add_member_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    assert add_member_response.status_code == 201
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    get_response = api_client.get(f"/events/{event_id}", headers=_auth_headers(staff_token))
+    patch_response = api_client.patch(
+        f"/events/{event_id}", json={"name": "Renamed by Organizer"}, headers=_auth_headers(staff_token)
+    )
+
+    assert get_response.status_code == 200
+    assert patch_response.status_code == 200
+    assert patch_response.json()["name"] == "Renamed by Organizer"
+
+    delete_response = api_client.delete(f"/events/{event_id}", headers=_auth_headers(staff_token))
+    assert delete_response.status_code == 204

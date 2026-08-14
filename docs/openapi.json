@@ -1466,6 +1466,56 @@
       }
     },
     "/organizations/{organization_id}/members": {
+      "get": {
+        "operationId": "list_organization_members_organizations__organization_id__members_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationMemberRead"
+                  },
+                  "title": "Response List Organization Members Organizations  Organization Id  Members Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Organization Members",
+        "tags": [
+          "organizations"
+        ]
+      },
       "post": {
         "operationId": "add_organization_member_organizations__organization_id__members_post",
         "parameters": [
@@ -1518,6 +1568,57 @@
           }
         ],
         "summary": "Add Organization Member",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{organization_id}/members/{member_id}": {
+      "delete": {
+        "operationId": "revoke_organization_member_organizations__organization_id__members__member_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Member Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Organization Member",
         "tags": [
           "organizations"
         ]

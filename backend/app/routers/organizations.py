@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_identity, require_organizer_claim, require_org_owner
+from app.auth.dependencies import (
+    get_current_identity,
+    org_member_role,
+    require_organizer_claim,
+    require_org_owner,
+)
 from app.auth.identity import Identity
 from app.db import get_db_session
 from app.models.organization import Organization, OrganizationMember, OrgRoleName
@@ -84,3 +89,55 @@ def add_organization_member(
         ) from None
     db.refresh(member)
     return member
+
+
+@router.get("/{organization_id}/members", response_model=list[OrganizationMemberRead])
+def list_organization_members(
+    organization_id: uuid.UUID,
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
+) -> list[OrganizationMember]:
+    org = db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="organization not found")
+    role = org_member_role(db, identity, organization_id)
+    if role not in (OrgRoleName.OWNER, OrgRoleName.ORGANIZER):
+        raise HTTPException(
+            status_code=403, detail="organizer role required for this organization"
+        )
+    return (
+        db.query(OrganizationMember)
+        .filter_by(organization_id=organization_id)
+        .order_by(OrganizationMember.id)
+        .all()
+    )
+
+
+@router.delete("/{organization_id}/members/{member_id}", status_code=204)
+def revoke_organization_member(
+    organization_id: uuid.UUID,
+    member_id: uuid.UUID,
+    identity: Identity = Depends(require_org_owner),
+    db: Session = Depends(get_db_session),
+) -> None:
+    member = db.get(OrganizationMember, member_id)
+    if member is None or member.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="organization member not found")
+    if member.role == OrgRoleName.OWNER:
+        # Lock the OWNER rows for this org within this transaction so a
+        # concurrent revoke of a different OWNER member can't read the same
+        # pre-delete count and also pass the <= 1 check (TOCTOU race). The
+        # second transaction's own with_for_update() blocks until this one
+        # commits/rolls back, then re-reads post-commit state.
+        owner_rows = (
+            db.query(OrganizationMember)
+            .filter_by(organization_id=organization_id, role=OrgRoleName.OWNER)
+            .with_for_update()
+            .all()
+        )
+        if len(owner_rows) <= 1:
+            raise HTTPException(
+                status_code=409, detail="cannot revoke the organization's only owner"
+            )
+    db.delete(member)
+    db.commit()

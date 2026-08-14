@@ -400,3 +400,27 @@ no real Google/Apple/Facebook accounts needed there, consistent with
 minimizing staging's external dependencies. Confirmed with the owner
 2026-08-09. Not yet scoped into a requirements-doc entry or roadmap
 issue — implementation is future MVP work, not started.
+
+## 2026-08-13 — Phase 12: RBAC cutover to org membership, and migration 0012's privilege-broadening tradeoff
+
+Phase 12 retires the per-event `EventOrganizer` grant table in favor of
+org-level `OrganizationMember` grants (FR31's org model): organizer
+rights are now scoped to an `Organization`, not a single `Event`, so any
+`OWNER`/`ORGANIZER` member of an org can operate on every event under
+that org, not just the one they originally created.
+
+Migration `0012` synthesizes an `OrganizationMember` row per surviving
+`EventOrganizer` row, scoped to that event's organization, so no
+pre-existing event loses its organizer during the cutover. For every
+pre-existing event that landed in the prior org-model phase's shared
+placeholder "Unassigned" organization, this synthesis means every legacy
+per-event organizer identity becomes an org-wide `ORGANIZER` on
+`Unassigned` — gaining rights over every *other* legacy event in that
+same placeholder org, not just the one(s) they organized. Confirmed with
+the owner as a non-issue today: only a single organizer identity exists
+across pre-existing events in deployed databases, so this synthesis
+grants that identity nothing it didn't already have de facto. Worth
+revisiting — splitting `Unassigned` into one org per distinct legacy
+organizer identity — if that ever changes (multiple distinct organizer
+identities accumulate events in `Unassigned`) before Phase 13's
+org-management UI exists to reassign events to proper orgs directly.
