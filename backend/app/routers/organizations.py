@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_identity, require_organizer_claim, require_org_owner
+from app.auth.dependencies import (
+    get_current_identity,
+    org_member_role,
+    require_organizer_claim,
+    require_org_owner,
+)
 from app.auth.identity import Identity
 from app.db import get_db_session
 from app.models.organization import Organization, OrganizationMember, OrgRoleName
@@ -84,3 +89,36 @@ def add_organization_member(
         ) from None
     db.refresh(member)
     return member
+
+
+@router.get("/{organization_id}/members", response_model=list[OrganizationMemberRead])
+def list_organization_members(
+    organization_id: uuid.UUID,
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
+) -> list[OrganizationMember]:
+    org = db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="organization not found")
+    if org_member_role(db, identity, organization_id) is None:
+        raise HTTPException(status_code=403, detail="membership on this organization required")
+    return (
+        db.query(OrganizationMember)
+        .filter_by(organization_id=organization_id)
+        .order_by(OrganizationMember.id)
+        .all()
+    )
+
+
+@router.delete("/{organization_id}/members/{member_id}", status_code=204)
+def revoke_organization_member(
+    organization_id: uuid.UUID,
+    member_id: uuid.UUID,
+    identity: Identity = Depends(require_org_owner),
+    db: Session = Depends(get_db_session),
+) -> None:
+    member = db.get(OrganizationMember, member_id)
+    if member is None or member.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="organization member not found")
+    db.delete(member)
+    db.commit()

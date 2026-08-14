@@ -158,3 +158,128 @@ def test_non_owner_member_cannot_add_member(api_client, make_token):
     )
 
     assert response.status_code == 403
+
+
+def test_owner_can_list_members(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+
+    response = api_client.get(f"/organizations/{org_id}/members", headers=_auth_headers(owner_token))
+
+    assert response.status_code == 200
+    roles = {row["role"] for row in response.json()}
+    assert roles == {"owner", "organizer"}
+
+
+def test_non_member_cannot_list_members(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    stranger_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.get(
+        f"/organizations/{org_id}/members", headers=_auth_headers(stranger_token)
+    )
+
+    assert response.status_code == 403
+
+
+def test_list_members_404s_for_unknown_org(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.get(f"/organizations/{uuid.uuid4()}/members", headers=_auth_headers(token))
+
+    assert response.status_code == 404
+
+
+def test_owner_can_revoke_member(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    member_id = add_response.json()["id"]
+
+    delete_response = api_client.delete(
+        f"/organizations/{org_id}/members/{member_id}", headers=_auth_headers(owner_token)
+    )
+    list_response = api_client.get(f"/organizations/{org_id}/members", headers=_auth_headers(owner_token))
+
+    assert delete_response.status_code == 204
+    assert len(list_response.json()) == 1
+
+
+def test_non_owner_cannot_revoke_member(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    member_id = add_response.json()["id"]
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.delete(
+        f"/organizations/{org_id}/members/{member_id}", headers=_auth_headers(staff_token)
+    )
+
+    assert response.status_code == 403
+
+
+def test_revoke_404s_for_member_not_belonging_to_org(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    other_org_id = _create_org(api_client, owner_token, name="Other Org")
+    staff_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{other_org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    member_id = add_response.json()["id"]
+
+    response = api_client.delete(
+        f"/organizations/{org_id}/members/{member_id}", headers=_auth_headers(owner_token)
+    )
+
+    assert response.status_code == 404
+
+
+def test_revoked_member_loses_event_access(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    member_id = add_response.json()["id"]
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+    event_response = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Staff Event", "organization_id": org_id},
+        headers=_auth_headers(staff_token),
+    )
+    event_id = event_response.json()["id"]
+
+    api_client.delete(
+        f"/organizations/{org_id}/members/{member_id}", headers=_auth_headers(owner_token)
+    )
+    response = api_client.get(f"/events/{event_id}", headers=_auth_headers(staff_token))
+
+    assert response.status_code == 403
