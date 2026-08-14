@@ -14,7 +14,6 @@ from app.auth.identity import Identity
 from app.db import get_db_session
 from app.models import Event, Pod
 from app.models.organization import OrgRoleName
-from app.models.rbac import EventOrganizer
 from app.routers.pods import delete_pod_children
 from app.schemas.event import EventCreate, EventRead, EventUpdate
 
@@ -40,14 +39,6 @@ def create_event(
         organization_id=payload.organization_id,
     )
     db.add(event)
-    db.flush()
-    db.add(
-        EventOrganizer(
-            event_id=event.id,
-            player_uuid=identity.player_uuid,
-            source_system=identity.source_system,
-        )
-    )
     db.commit()
     db.refresh(event)
     return event
@@ -119,6 +110,12 @@ def delete_event(
     for pod in db.query(Pod).filter_by(event_id=event_id).all():
         delete_pod_children(db, pod.id)
         db.delete(pod)
-    db.query(EventOrganizer).filter_by(event_id=event_id).delete()
+    # Explicit flush: Pod/Event aren't linked by an ORM relationship(), so the
+    # unit of work has no dependency info to order their deletes within a
+    # single flush. Previously the now-removed EventOrganizer bulk-delete
+    # query triggered an incidental autoflush here that masked this; without
+    # it, deleting the event in the same flush as the pods risks an FK
+    # violation if the event happens to flush first.
+    db.flush()
     db.delete(event)
     db.commit()
