@@ -88,15 +88,23 @@ def upgrade() -> None:
     op.create_index("ix_events_organization_id", "events", ["organization_id"])
 
     conn = op.get_bind()
-    conn.execute(
-        sa.text("INSERT INTO organizations (id, name, created_at) VALUES (:id, :name, now())"),
-        {"id": PLACEHOLDER_ORG_ID, "name": "Unassigned"},
-    )
-    conn.execute(
-        sa.text("UPDATE events SET organization_id = :org_id WHERE organization_id IS NULL"),
-        {"org_id": PLACEHOLDER_ORG_ID},
-    )
-    conn.execute(sa.text("UPDATE events SET name = 'Untitled Event' WHERE name IS NULL"))
+    # Only insert the placeholder org and backfill pre-existing rows if any
+    # `events` rows actually exist yet. On a brand-new database (zero rows),
+    # skipping this leaves no orphan "Unassigned" Organization behind — the
+    # subsequent alter_column(..., nullable=False) calls are correct either
+    # way since there are no rows to violate the constraint.
+    if conn.execute(sa.text("SELECT count(*) FROM events")).scalar():
+        conn.execute(
+            sa.text(
+                "INSERT INTO organizations (id, name, created_at) VALUES (:id, :name, now())"
+            ),
+            {"id": PLACEHOLDER_ORG_ID, "name": "Unassigned"},
+        )
+        conn.execute(
+            sa.text("UPDATE events SET organization_id = :org_id WHERE organization_id IS NULL"),
+            {"org_id": PLACEHOLDER_ORG_ID},
+        )
+        conn.execute(sa.text("UPDATE events SET name = 'Untitled Event' WHERE name IS NULL"))
 
     op.alter_column("events", "name", nullable=False)
     op.alter_column("events", "organization_id", nullable=False)
