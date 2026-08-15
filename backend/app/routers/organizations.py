@@ -18,7 +18,9 @@ from app.schemas.organization import (
     OrganizationDetailRead,
     OrganizationMemberCreate,
     OrganizationMemberRead,
+    OrganizationMemberUpdate,
     OrganizationRead,
+    OrganizationUpdate,
 )
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
@@ -82,6 +84,20 @@ def get_organization(
     return {"id": org.id, "name": org.name, "viewer_role": role}
 
 
+@router.patch("/{organization_id}", response_model=OrganizationRead)
+def update_organization(
+    organization_id: uuid.UUID,
+    payload: OrganizationUpdate,
+    identity: Identity = Depends(require_org_owner),
+    db: Session = Depends(get_db_session),
+) -> Organization:
+    org = db.get(Organization, organization_id)
+    org.name = payload.name
+    db.commit()
+    db.refresh(org)
+    return org
+
+
 @router.post("/{organization_id}/members", response_model=OrganizationMemberRead, status_code=201)
 def add_organization_member(
     organization_id: uuid.UUID,
@@ -103,6 +119,37 @@ def add_organization_member(
         raise HTTPException(
             status_code=409, detail="this identity already has a role on this organization"
         ) from None
+    db.refresh(member)
+    return member
+
+
+@router.patch("/{organization_id}/members/{member_id}", response_model=OrganizationMemberRead)
+def update_organization_member(
+    organization_id: uuid.UUID,
+    member_id: uuid.UUID,
+    payload: OrganizationMemberUpdate,
+    identity: Identity = Depends(require_org_owner),
+    db: Session = Depends(get_db_session),
+) -> OrganizationMember:
+    member = db.get(OrganizationMember, member_id)
+    if member is None or member.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="organization member not found")
+    if member.role == OrgRoleName.OWNER and payload.role != OrgRoleName.OWNER:
+        # Same with_for_update() lockout guard as revoke_organization_member
+        # (backend/app/routers/organizations.py) — a demotion away from OWNER
+        # is equivalent to a revocation for lockout purposes.
+        owner_rows = (
+            db.query(OrganizationMember)
+            .filter_by(organization_id=organization_id, role=OrgRoleName.OWNER)
+            .with_for_update()
+            .all()
+        )
+        if len(owner_rows) <= 1:
+            raise HTTPException(
+                status_code=409, detail="cannot revoke the organization's only owner"
+            )
+    member.role = payload.role
+    db.commit()
     db.refresh(member)
     return member
 

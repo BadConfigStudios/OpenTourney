@@ -9,6 +9,10 @@ class OrganizationCreate(BaseModel):
     name: str
 
 
+class OrganizationUpdate(BaseModel):
+    name: str
+
+
 class OrganizationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,6 +27,10 @@ class OrganizationDetailRead(OrganizationRead):
 class OrganizationMemberCreate(BaseModel):
     player_uuid: uuid.UUID
     source_system: str
+    role: OrgRoleName
+
+
+class OrganizationMemberUpdate(BaseModel):
     role: OrgRoleName
 
 
