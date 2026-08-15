@@ -367,3 +367,53 @@ def test_revoked_member_loses_event_access(api_client, make_token):
     response = api_client.get(f"/events/{event_id}", headers=_auth_headers(staff_token))
 
     assert response.status_code == 403
+
+
+def test_get_organization_returns_name_and_viewer_role(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(owner_token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == org_id
+    assert body["name"] == "Dragon's Den"
+    assert body["viewer_role"] == "owner"
+
+
+def test_get_organization_reflects_non_owner_viewer_role(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "scorekeeper"},
+        headers=_auth_headers(owner_token),
+    )
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(staff_token))
+
+    assert response.status_code == 200
+    assert response.json()["viewer_role"] == "scorekeeper"
+
+
+def test_get_organization_404s_for_unknown_org(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.get(f"/organizations/{uuid.uuid4()}", headers=_auth_headers(token))
+
+    assert response.status_code == 404
+
+
+def test_get_organization_403s_for_non_member(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    stranger_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(stranger_token))
+
+    assert response.status_code == 403

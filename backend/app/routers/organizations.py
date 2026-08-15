@@ -15,6 +15,7 @@ from app.db import get_db_session
 from app.models.organization import Organization, OrganizationMember, OrgRoleName
 from app.schemas.organization import (
     OrganizationCreate,
+    OrganizationDetailRead,
     OrganizationMemberCreate,
     OrganizationMemberRead,
     OrganizationRead,
@@ -64,6 +65,21 @@ def list_organizations(
         .order_by(Organization.name, Organization.id)
         .all()
     )
+
+
+@router.get("/{organization_id}", response_model=OrganizationDetailRead)
+def get_organization(
+    organization_id: uuid.UUID,
+    identity: Identity = Depends(get_current_identity),
+    db: Session = Depends(get_db_session),
+) -> dict:
+    org = db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="organization not found")
+    role = org_member_role(db, identity, organization_id)
+    if role is None:
+        raise HTTPException(status_code=403, detail="not a member of this organization")
+    return {"id": org.id, "name": org.name, "viewer_role": role}
 
 
 @router.post("/{organization_id}/members", response_model=OrganizationMemberRead, status_code=201)

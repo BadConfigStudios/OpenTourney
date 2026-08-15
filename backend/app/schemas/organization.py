@@ -16,6 +16,10 @@ class OrganizationRead(BaseModel):
     name: str
 
 
+class OrganizationDetailRead(OrganizationRead):
+    viewer_role: OrgRoleName
+
+
 class OrganizationMemberCreate(BaseModel):
     player_uuid: uuid.UUID
     source_system: str
