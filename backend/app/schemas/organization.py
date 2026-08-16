@@ -1,16 +1,16 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.organization import OrgRoleName
 
 
 class OrganizationCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
 
 
 class OrganizationUpdate(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
 
 
 class OrganizationRead(BaseModel):

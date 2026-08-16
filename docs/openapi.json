@@ -360,6 +360,7 @@
       "OrganizationCreate": {
         "properties": {
           "name": {
+            "minLength": 1,
             "title": "Name",
             "type": "string"
           }
@@ -485,6 +486,7 @@
       "OrganizationUpdate": {
         "properties": {
           "name": {
+            "minLength": 1,
             "title": "Name",
             "type": "string"
           }

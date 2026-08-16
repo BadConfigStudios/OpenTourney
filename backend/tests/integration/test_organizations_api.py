@@ -433,6 +433,27 @@ def test_owner_renames_organization(api_client, make_token):
     assert get_response.json()["name"] == "New Name"
 
 
+def test_rename_rejects_empty_name(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    response = api_client.patch(
+        f"/organizations/{org_id}", json={"name": ""}, headers=_auth_headers(owner_token)
+    )
+
+    assert response.status_code == 422
+    get_response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(owner_token))
+    assert get_response.json()["name"] == "Dragon's Den"
+
+
+def test_create_organization_rejects_empty_name(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.post("/organizations", json={"name": ""}, headers=_auth_headers(token))
+
+    assert response.status_code == 422
+
+
 def test_non_owner_cannot_rename_organization(api_client, make_token):
     owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     org_id = _create_org(api_client, owner_token)
