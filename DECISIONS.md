@@ -424,3 +424,28 @@ revisiting — splitting `Unassigned` into one org per distinct legacy
 organizer identity — if that ever changes (multiple distinct organizer
 identities accumulate events in `Unassigned`) before Phase 13's
 org-management UI exists to reassign events to proper orgs directly.
+
+## 2026-08-16 — Fix #76: real persona JWTs injected at frontend container start, not baked into the image
+
+Root cause: `frontend/public/config.json` (fetched by `ConfigProvider` at
+runtime) was a static file baked into the prod image at `docker build`
+time via `npm run build`, with the literal placeholder strings
+`dev-organizer-token`/etc. committed to git. No mechanism ever existed to
+replace them with real JWTs at deploy time, despite the 2026-08-03
+persona-switcher decision above requiring exactly that
+("Helm-secret-injected at deploy time"). Every authenticated route
+401'd on staging as a result (`decode_token`: "Not enough segments").
+
+Fix: `frontend/config.json.template` (checked into git, `${VAR}`
+placeholders) ships in the prod image alongside a
+`docker-entrypoint.d/40-persona-config.sh` script that `envsubst`s it
+into `/usr/share/nginx/html/config.json` at container start, using
+`PERSONA_ORGANIZER_TOKEN`/`PERSONA_SCOREKEEPER_TOKEN`/`PERSONA_PLAYER_TOKEN`
+env vars sourced from the chart's existing Secret (same pattern as
+`OIDC_JWKS_STATIC`). The owner mints the three real tokens once via
+`backend/scripts/mint_test_token.py` against staging's existing
+`oidcJwksStatic` keypair and passes them as `--set-string` Helm values —
+no new infra, no mock IdP, consistent with the 2026-08-02 static-JWKS
+decision above. `frontend/public/config.json` (used by local
+`npm run dev`) is untouched — local dev auth setup is a separate,
+pre-existing gap, not part of this fix's scope.

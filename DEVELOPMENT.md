@@ -75,6 +75,14 @@ alone:
   - `secrets.oidcAudience` — OIDC audience
   - `secrets.oidcJwksUrl` **or** `secrets.oidcJwksStatic` — one of the two,
     for JWKS key resolution
+  - `secrets.personaOrganizerToken`, `secrets.personaScorekeeperToken`,
+    `secrets.personaPlayerToken` — real JWTs for the frontend's persona
+    switcher (FR26), minted via `backend/scripts/mint_test_token.py`
+    against the same keypair backing `secrets.oidcJwksStatic`. The
+    frontend's entrypoint script writes these into `config.json` at
+    container start (see `DECISIONS.md` 2026-08-16); leaving them unset
+    serves an unusable empty-token config and every authenticated route
+    401s in the browser.
 
 ### Namespace & values
 
@@ -117,7 +125,10 @@ alone:
      --set-string secrets.databaseUrl=<database-url> \
      --set-string secrets.oidcIssuer=<oidc-issuer> \
      --set-string secrets.oidcAudience=<oidc-audience> \
-     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json>
+     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json> \
+     --set-string secrets.personaOrganizerToken=<organizer-jwt> \
+     --set-string secrets.personaScorekeeperToken=<scorekeeper-jwt> \
+     --set-string secrets.personaPlayerToken=<player-jwt>
    ```
 
    `secrets.databaseUrl`, `secrets.oidcIssuer`, and `secrets.oidcAudience`
