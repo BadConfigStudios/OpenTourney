@@ -18,6 +18,12 @@ spec:
         app.kubernetes.io/component: zitadel
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      # Disabled: the Service is intentionally named "zitadel" (see zitadel-service.yaml), which
+      # causes kubelet to inject a legacy Docker-links env var ZITADEL_PORT=tcp://<clusterIP>:8080
+      # into this pod. That collides with Zitadel's own ZITADEL_PORT config field, which expects a
+      # bare numeric port and fails to parse the URL. enableServiceLinks: false stops kubelet from
+      # injecting any {SVCNAME}_* service-discovery env vars into this pod.
+      enableServiceLinks: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -71,7 +77,7 @@ spec:
                   name: {{ .Values.percona.clusterName }}-pguser-zitadel
                   key: password
             - name: ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE
-              value: "disable"
+              value: "require"
             - name: ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -83,7 +89,7 @@ spec:
                   name: {{ .Values.percona.clusterName }}-pguser-zitadel
                   key: password
             - name: ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE
-              value: "disable"
+              value: "require"
             - name: ZITADEL_FIRSTINSTANCE_ORG_NAME
               value: {{ .Values.zitadel.firstInstance.orgName | quote }}
             - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME
