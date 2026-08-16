@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query";
 import { fireEvent, screen, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -83,6 +84,42 @@ describe("OrganizationDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save name" }));
 
     expect(await screen.findByText("New Name")).toBeInTheDocument();
+  });
+
+  it("tracks server renames after a successful save instead of pinning to the local draft", async () => {
+    server.use(
+      http.get("/organizations/org-1", () => HttpResponse.json(OWNER_ORG)),
+      http.get("/organizations/org-1/members", () => HttpResponse.json(MEMBERS)),
+      http.patch("/organizations/org-1", async ({ request }) => {
+        const body = (await request.json()) as { name: string };
+        return HttpResponse.json({ id: "org-1", name: body.name });
+      }),
+    );
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    renderWithProviders(<OrganizationDetail />, {
+      path: "/organizations/org-1",
+      routePath: "/organizations/:organizationId",
+      queryClient,
+    });
+
+    await screen.findByText("Dragon's Den");
+    fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "First Edit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save name" }));
+    await screen.findByText("First Edit");
+
+    // Simulate an out-of-band cache update (another tab's rename, a background
+    // refetch) landing after the local save. If the local draft were still
+    // "First Edit", the input would keep showing it instead of this new name.
+    queryClient.setQueryData(["organizations", "org-1"], {
+      id: "org-1",
+      name: "External Rename",
+      viewer_role: "owner",
+    });
+    expect(await screen.findByText("External Rename")).toBeInTheDocument();
+    expect(screen.getByLabelText("Organization name")).toHaveValue("External Rename");
   });
 
   it("disables Save name and does not fire the mutation when the field is cleared to empty", async () => {

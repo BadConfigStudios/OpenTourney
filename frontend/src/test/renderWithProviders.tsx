@@ -12,15 +12,17 @@ function NavigatedTo() {
 
 export function renderWithProviders(
   element: ReactElement,
-  options: { path?: string; routePath?: string; personaLabel?: string } = {},
+  options: { path?: string; routePath?: string; personaLabel?: string; queryClient?: QueryClient } = {},
 ) {
   if (options.personaLabel) {
     localStorage.setItem("opentourney.persona", options.personaLabel);
   }
 
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
+  const queryClient =
+    options.queryClient ??
+    new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
 
   const path = options.path ?? "/";
   const routePath = options.routePath ?? path;

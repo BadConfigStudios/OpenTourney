@@ -1,16 +1,26 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.organization import OrgRoleName
+
+
+def _reject_blank_name(name: str) -> str:
+    if not name.strip():
+        raise ValueError("name must not be blank")
+    return name
 
 
 class OrganizationCreate(BaseModel):
     name: str = Field(min_length=1)
 
+    _reject_blank_name = field_validator("name")(_reject_blank_name)
+
 
 class OrganizationUpdate(BaseModel):
     name: str = Field(min_length=1)
+
+    _reject_blank_name = field_validator("name")(_reject_blank_name)
 
 
 class OrganizationRead(BaseModel):

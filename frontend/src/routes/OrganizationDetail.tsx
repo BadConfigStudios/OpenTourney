@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import {
   addOrganizationMember,
@@ -40,14 +40,20 @@ export function OrganizationDetail() {
     enabled: canViewMembers,
   });
 
+  useEffect(() => {
+    setNameDraft(null);
+  }, [organizationId]);
+
   const renameMutation = useMutation({
     mutationFn: () =>
       updateOrganization(apiFetch, organizationId, (nameDraft ?? orgQuery.data?.name ?? "").trim()),
-    onSuccess: (data) =>
+    onSuccess: (data) => {
       queryClient.setQueryData(
         ["organizations", organizationId],
         (old: OrganizationDetailRead | undefined) => (old ? { ...old, name: data.name } : old),
-      ),
+      );
+      setNameDraft(null);
+    },
   });
 
   const addMemberMutation = useMutation({
