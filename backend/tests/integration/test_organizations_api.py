@@ -367,3 +367,257 @@ def test_revoked_member_loses_event_access(api_client, make_token):
     response = api_client.get(f"/events/{event_id}", headers=_auth_headers(staff_token))
 
     assert response.status_code == 403
+
+
+def test_get_organization_returns_name_and_viewer_role(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(owner_token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == org_id
+    assert body["name"] == "Dragon's Den"
+    assert body["viewer_role"] == "owner"
+
+
+def test_get_organization_reflects_non_owner_viewer_role(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "scorekeeper"},
+        headers=_auth_headers(owner_token),
+    )
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(staff_token))
+
+    assert response.status_code == 200
+    assert response.json()["viewer_role"] == "scorekeeper"
+
+
+def test_get_organization_404s_for_unknown_org(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.get(f"/organizations/{uuid.uuid4()}", headers=_auth_headers(token))
+
+    assert response.status_code == 404
+
+
+def test_get_organization_403s_for_non_member(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    stranger_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(stranger_token))
+
+    assert response.status_code == 403
+
+
+def test_owner_renames_organization(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    response = api_client.patch(
+        f"/organizations/{org_id}", json={"name": "New Name"}, headers=_auth_headers(owner_token)
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "New Name"
+    get_response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(owner_token))
+    assert get_response.json()["name"] == "New Name"
+
+
+def test_rename_rejects_empty_name(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    response = api_client.patch(
+        f"/organizations/{org_id}", json={"name": ""}, headers=_auth_headers(owner_token)
+    )
+
+    assert response.status_code == 422
+    get_response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(owner_token))
+    assert get_response.json()["name"] == "Dragon's Den"
+
+
+def test_create_organization_rejects_empty_name(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.post("/organizations", json={"name": ""}, headers=_auth_headers(token))
+
+    assert response.status_code == 422
+
+
+def test_rename_rejects_whitespace_only_name(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+
+    response = api_client.patch(
+        f"/organizations/{org_id}", json={"name": "   "}, headers=_auth_headers(owner_token)
+    )
+
+    assert response.status_code == 422
+    get_response = api_client.get(f"/organizations/{org_id}", headers=_auth_headers(owner_token))
+    assert get_response.json()["name"] == "Dragon's Den"
+
+
+def test_non_owner_cannot_rename_organization(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.patch(
+        f"/organizations/{org_id}", json={"name": "New Name"}, headers=_auth_headers(staff_token)
+    )
+
+    assert response.status_code == 403
+
+
+def test_rename_404s_for_unknown_org(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+
+    response = api_client.patch(
+        f"/organizations/{uuid.uuid4()}", json={"name": "New Name"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 404
+
+
+def test_owner_changes_member_role(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "scorekeeper"},
+        headers=_auth_headers(owner_token),
+    )
+    member_id = add_response.json()["id"]
+
+    response = api_client.patch(
+        f"/organizations/{org_id}/members/{member_id}",
+        json={"role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "organizer"
+
+
+def test_non_owner_cannot_change_member_role(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    staff_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "scorekeeper"},
+        headers=_auth_headers(owner_token),
+    )
+    member_id = add_response.json()["id"]
+    staff_token = make_token(
+        player_uuid=uuid.UUID(staff_uuid), source_system="club-checkin", roles=["organizer"]
+    )
+
+    response = api_client.patch(
+        f"/organizations/{org_id}/members/{member_id}",
+        json={"role": "organizer"},
+        headers=_auth_headers(staff_token),
+    )
+
+    assert response.status_code == 403
+
+
+def test_role_change_404s_for_member_not_belonging_to_org(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    other_org_id = _create_org(api_client, owner_token, name="Other Org")
+    staff_uuid = str(uuid.uuid4())
+    add_response = api_client.post(
+        f"/organizations/{other_org_id}/members",
+        json={"player_uuid": staff_uuid, "source_system": "club-checkin", "role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+    member_id = add_response.json()["id"]
+
+    response = api_client.patch(
+        f"/organizations/{org_id}/members/{member_id}",
+        json={"role": "scorekeeper"},
+        headers=_auth_headers(owner_token),
+    )
+
+    assert response.status_code == 404
+
+
+def test_demoting_the_only_owner_returns_409(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    members_response = api_client.get(
+        f"/organizations/{org_id}/members", headers=_auth_headers(owner_token)
+    )
+    owner_member_id = members_response.json()[0]["id"]
+
+    response = api_client.patch(
+        f"/organizations/{org_id}/members/{owner_member_id}",
+        json={"role": "organizer"},
+        headers=_auth_headers(owner_token),
+    )
+
+    assert response.status_code == 409
+    get_response = api_client.get(f"/organizations/{org_id}/members", headers=_auth_headers(owner_token))
+    assert get_response.json()[0]["role"] == "owner"
+
+
+def test_demoting_one_of_multiple_owners_succeeds(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    members_response = api_client.get(
+        f"/organizations/{org_id}/members", headers=_auth_headers(owner_token)
+    )
+    first_owner_member_id = members_response.json()[0]["id"]
+    second_owner_uuid = str(uuid.uuid4())
+    api_client.post(
+        f"/organizations/{org_id}/members",
+        json={"player_uuid": second_owner_uuid, "source_system": "club-checkin", "role": "owner"},
+        headers=_auth_headers(owner_token),
+    )
+
+    response = api_client.patch(
+        f"/organizations/{org_id}/members/{first_owner_member_id}",
+        json={"role": "scorekeeper"},
+        headers=_auth_headers(owner_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "scorekeeper"
+
+
+def test_changing_role_to_same_owner_role_does_not_trigger_lockout_guard(api_client, make_token):
+    owner_token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = _create_org(api_client, owner_token)
+    members_response = api_client.get(
+        f"/organizations/{org_id}/members", headers=_auth_headers(owner_token)
+    )
+    owner_member_id = members_response.json()[0]["id"]
+
+    response = api_client.patch(
+        f"/organizations/{org_id}/members/{owner_member_id}",
+        json={"role": "owner"},
+        headers=_auth_headers(owner_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "owner"
