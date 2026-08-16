@@ -94,8 +94,13 @@ alone:
   `charts/opentourney/values.yaml`)
 - kubectl context: `mcgee-local` (or `mcgee-remote` if off-network and
   `mcgee-local` times out)
-- Public URL: TBD — no Cloudflare Tunnel hostname is assigned yet. Until one
-  exists, reach the deployment via `kubectl port-forward`.
+- Public URL: `https://opentourney-staging.badconfig.com` (Cloudflare
+  Tunnel, same tunnel as other cube cluster projects, routed to
+  `frontend.opentourney-staging.svc:80`), gated behind Cloudflare Access
+  — see #79 for why the whole hostname must stay behind Access as long
+  as the persona-switcher issues real standing JWTs with no login.
+  `kubectl port-forward` still works for anything Access shouldn't
+  gate (e.g. hitting the backend directly for curl-based verification).
 
 ### Deploy workflow
 
