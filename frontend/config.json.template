@@ -1,0 +1,7 @@
+{
+  "personas": [
+    { "label": "Organizer", "role": "organizer", "token": "${PERSONA_ORGANIZER_TOKEN}" },
+    { "label": "Scorekeeper", "role": "scorekeeper", "token": "${PERSONA_SCOREKEEPER_TOKEN}" },
+    { "label": "Player", "role": "player", "token": "${PERSONA_PLAYER_TOKEN}" }
+  ]
+}

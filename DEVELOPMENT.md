@@ -75,6 +75,17 @@ alone:
   - `secrets.oidcAudience` — OIDC audience
   - `secrets.oidcJwksUrl` **or** `secrets.oidcJwksStatic` — one of the two,
     for JWKS key resolution
+  - `secrets.personaOrganizerToken`, `secrets.personaScorekeeperToken`,
+    `secrets.personaPlayerToken` — real JWTs for the frontend's persona
+    switcher (FR26), minted via `backend/scripts/mint_test_token.py`
+    against the same keypair backing `secrets.oidcJwksStatic`. The
+    frontend's entrypoint script writes these into `config.json` at
+    container start (see `DECISIONS.md` 2026-08-16); leaving any of them
+    unset produces a `config.json` with an empty token for that persona,
+    which fails `ConfigProvider`'s validation for the whole file —
+    every persona fails to load, not just the one with the missing
+    token, and the app shows "Failed to load app configuration" for
+    every visitor.
 
 ### Namespace & values
 
@@ -83,8 +94,13 @@ alone:
   `charts/opentourney/values.yaml`)
 - kubectl context: `mcgee-local` (or `mcgee-remote` if off-network and
   `mcgee-local` times out)
-- Public URL: TBD — no Cloudflare Tunnel hostname is assigned yet. Until one
-  exists, reach the deployment via `kubectl port-forward`.
+- Public URL: `https://opentourney-staging.badconfig.com` (Cloudflare
+  Tunnel, same tunnel as other cube cluster projects, routed to
+  `frontend.opentourney-staging.svc:80`), gated behind Cloudflare Access
+  — see #79 for why the whole hostname must stay behind Access as long
+  as the persona-switcher issues real standing JWTs with no login.
+  `kubectl port-forward` still works for anything Access shouldn't
+  gate (e.g. hitting the backend directly for curl-based verification).
 
 ### Deploy workflow
 
@@ -117,7 +133,10 @@ alone:
      --set-string secrets.databaseUrl=<database-url> \
      --set-string secrets.oidcIssuer=<oidc-issuer> \
      --set-string secrets.oidcAudience=<oidc-audience> \
-     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json>
+     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json> \
+     --set-string secrets.personaOrganizerToken=<organizer-jwt> \
+     --set-string secrets.personaScorekeeperToken=<scorekeeper-jwt> \
+     --set-string secrets.personaPlayerToken=<player-jwt>
    ```
 
    `secrets.databaseUrl`, `secrets.oidcIssuer`, and `secrets.oidcAudience`

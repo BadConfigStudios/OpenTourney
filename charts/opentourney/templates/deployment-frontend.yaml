@@ -16,6 +16,8 @@ spec:
       labels:
         app.kubernetes.io/component: frontend
         app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/persona-secret: {{ printf "%s|%s|%s" .Values.secrets.personaOrganizerToken .Values.secrets.personaScorekeeperToken .Values.secrets.personaPlayerToken | sha256sum }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -25,6 +27,22 @@ spec:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          env:
+            - name: PERSONA_ORGANIZER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ot.fullname" . }}-secrets
+                  key: PERSONA_ORGANIZER_TOKEN
+            - name: PERSONA_SCOREKEEPER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ot.fullname" . }}-secrets
+                  key: PERSONA_SCOREKEEPER_TOKEN
+            - name: PERSONA_PLAYER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ot.fullname" . }}-secrets
+                  key: PERSONA_PLAYER_TOKEN
           ports:
             - containerPort: {{ .Values.frontend.port }}
           readinessProbe:

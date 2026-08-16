@@ -40,3 +40,6 @@ secrets:
   oidcAudience: ""
   oidcJwksUrl: ""
   oidcJwksStatic: ""
+  personaOrganizerToken: ""
+  personaScorekeeperToken: ""
+  personaPlayerToken: ""
