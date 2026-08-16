@@ -28,6 +28,11 @@ import requests
 
 ZITADEL_BASE = "http://localhost:8080"
 MGMT = f"{ZITADEL_BASE}/management/v1"
+# Zitadel validates the Host header against ZITADEL_EXTERNALDOMAIN (anti-DNS-rebinding
+# protection) and returns 404 for any request presenting a different Host — including
+# the "localhost:8080" the requests library would otherwise send by default when hitting
+# this same-pod address. Every request must carry the external domain as its Host header.
+ZITADEL_EXTERNAL_DOMAIN = os.environ["ZITADEL_EXTERNAL_DOMAIN"]
 PAT_PATH = "/pat/pat.txt"
 ROLES = ["organizer", "scorekeeper", "player"]
 PROJECT_NAME = "OpenTourney"
@@ -198,6 +203,7 @@ def main():
     pat = wait_for_pat()
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {pat}"
+    session.headers["Host"] = ZITADEL_EXTERNAL_DOMAIN
 
     project_id = get_or_create_project(session)
     print(f"project {PROJECT_NAME!r} id={project_id}")

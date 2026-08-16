@@ -122,6 +122,13 @@ spec:
         - name: bootstrap
           image: python:3.12-alpine
           command: ["sh", "-c", "pip install --no-cache-dir requests && python /scripts/bootstrap.py"]
+          env:
+            # Zitadel validates the request Host header against ZITADEL_EXTERNALDOMAIN
+            # (anti-DNS-rebinding protection) and 404s otherwise. The sidecar connects
+            # via localhost:8080 (same pod) but must still present the external domain
+            # as the Host header for every Management API call.
+            - name: ZITADEL_EXTERNAL_DOMAIN
+              value: {{ .Values.zitadel.externalDomain | quote }}
           volumeMounts:
             - name: pat
               mountPath: /pat
