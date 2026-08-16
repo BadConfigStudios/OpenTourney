@@ -1,0 +1,113 @@
+{{- if .Values.zitadel.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: zitadel
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: zitadel
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: pat
+          emptyDir: {}
+      containers:
+        - name: zitadel
+          image: "{{ .Values.zitadel.image.repository }}:{{ .Values.zitadel.image.tag }}"
+          imagePullPolicy: {{ .Values.zitadel.image.pullPolicy }}
+          args: ["start-from-init", "--masterkeyFromEnv"]
+          volumeMounts:
+            - name: pat
+              mountPath: /pat
+          envFrom:
+            - secretRef:
+                name: {{ include "ot.fullname" . }}-zitadel-secrets
+          env:
+            - name: ZITADEL_EXTERNALDOMAIN
+              value: {{ .Values.zitadel.externalDomain | quote }}
+            - name: ZITADEL_EXTERNALPORT
+              value: {{ .Values.zitadel.externalPort | quote }}
+            - name: ZITADEL_EXTERNALSECURE
+              value: "false"
+            - name: ZITADEL_TLS_ENABLED
+              value: "false"
+            - name: ZITADEL_DATABASE_POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.percona.clusterName }}-pguser-zitadel
+                  key: host
+            - name: ZITADEL_DATABASE_POSTGRES_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.percona.clusterName }}-pguser-zitadel
+                  key: port
+            - name: ZITADEL_DATABASE_POSTGRES_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.percona.clusterName }}-pguser-zitadel
+                  key: dbname
+            - name: ZITADEL_DATABASE_POSTGRES_USER_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.percona.clusterName }}-pguser-zitadel
+                  key: user
+            - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.percona.clusterName }}-pguser-zitadel
+                  key: password
+            - name: ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE
+              value: "disable"
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.percona.clusterName }}-pguser-zitadel
+                  key: user
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.percona.clusterName }}-pguser-zitadel
+                  key: password
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE
+              value: "disable"
+            - name: ZITADEL_FIRSTINSTANCE_ORG_NAME
+              value: {{ .Values.zitadel.firstInstance.orgName | quote }}
+            - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME
+              value: {{ .Values.zitadel.firstInstance.adminUsername | quote }}
+            - name: ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME
+              value: "bootstrap-automation"
+            - name: ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME
+              value: "bootstrap-automation"
+            - name: ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE
+              value: "2030-01-01T00:00:00Z"
+            - name: ZITADEL_FIRSTINSTANCE_PATPATH
+              value: "/pat/pat.txt"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /debug/healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /debug/healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+{{- end }}

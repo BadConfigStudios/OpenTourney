@@ -49,6 +49,7 @@ zitadel:
     pullPolicy: IfNotPresent
   externalDomain: "zitadel.opentourney-staging.svc.cluster.local"
   externalPort: 8080
+  masterkey: ""
   firstInstance:
     orgName: "OpenTourney"
     adminUsername: "admin"
