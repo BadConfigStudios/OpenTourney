@@ -370,6 +370,29 @@
         "title": "OrganizationCreate",
         "type": "object"
       },
+      "OrganizationDetailRead": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "viewer_role": {
+            "$ref": "#/components/schemas/OrgRoleName"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "viewer_role"
+        ],
+        "title": "OrganizationDetailRead",
+        "type": "object"
+      },
       "OrganizationMemberCreate": {
         "properties": {
           "player_uuid": {
@@ -428,6 +451,18 @@
         "title": "OrganizationMemberRead",
         "type": "object"
       },
+      "OrganizationMemberUpdate": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/OrgRoleName"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "OrganizationMemberUpdate",
+        "type": "object"
+      },
       "OrganizationRead": {
         "properties": {
           "id": {
@@ -445,6 +480,19 @@
           "name"
         ],
         "title": "OrganizationRead",
+        "type": "object"
+      },
+      "OrganizationUpdate": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OrganizationUpdate",
         "type": "object"
       },
       "PodCreate": {
@@ -1465,6 +1513,110 @@
         ]
       }
     },
+    "/organizations/{organization_id}": {
+      "get": {
+        "operationId": "get_organization_organizations__organization_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDetailRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Organization",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "patch": {
+        "operationId": "update_organization_organizations__organization_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
     "/organizations/{organization_id}/members": {
       "get": {
         "operationId": "list_organization_members_organizations__organization_id__members_get",
@@ -1619,6 +1771,72 @@
           }
         ],
         "summary": "Revoke Organization Member",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "patch": {
+        "operationId": "update_organization_member_organizations__organization_id__members__member_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Member Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationMemberUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Organization Member",
         "tags": [
           "organizations"
         ]
