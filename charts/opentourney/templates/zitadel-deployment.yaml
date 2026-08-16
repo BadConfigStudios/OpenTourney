@@ -31,6 +31,9 @@ spec:
       volumes:
         - name: pat
           emptyDir: {}
+        - name: bootstrap-script
+          configMap:
+            name: {{ include "ot.fullname" . }}-zitadel-bootstrap
       containers:
         - name: zitadel
           image: "{{ .Values.zitadel.image.repository }}:{{ .Values.zitadel.image.tag }}"
@@ -116,4 +119,12 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 30
+        - name: bootstrap
+          image: python:3.12-alpine
+          command: ["sh", "-c", "pip install --no-cache-dir requests && python /scripts/bootstrap.py"]
+          volumeMounts:
+            - name: pat
+              mountPath: /pat
+            - name: bootstrap-script
+              mountPath: /scripts
 {{- end }}
