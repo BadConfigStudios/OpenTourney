@@ -80,9 +80,12 @@ alone:
     switcher (FR26), minted via `backend/scripts/mint_test_token.py`
     against the same keypair backing `secrets.oidcJwksStatic`. The
     frontend's entrypoint script writes these into `config.json` at
-    container start (see `DECISIONS.md` 2026-08-16); leaving them unset
-    serves an unusable empty-token config and every authenticated route
-    401s in the browser.
+    container start (see `DECISIONS.md` 2026-08-16); leaving any of them
+    unset produces a `config.json` with an empty token for that persona,
+    which fails `ConfigProvider`'s validation for the whole file —
+    every persona fails to load, not just the one with the missing
+    token, and the app shows "Failed to load app configuration" for
+    every visitor.
 
 ### Namespace & values
 

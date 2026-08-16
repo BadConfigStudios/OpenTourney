@@ -17,7 +17,7 @@ spec:
         app.kubernetes.io/component: frontend
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/persona-secret: {{ printf "%s|%s|%s" .Values.secrets.personaOrganizerToken .Values.secrets.personaScorekeeperToken .Values.secrets.personaPlayerToken | sha256sum }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
