@@ -23,7 +23,7 @@ export function OrganizationDetail() {
 
   const { apiFetch } = useAuth();
   const queryClient = useQueryClient();
-  const [nameDraft, setNameDraft] = useState("");
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [newPlayerUuid, setNewPlayerUuid] = useState("");
   const [newSourceSystem, setNewSourceSystem] = useState("");
   const [newRole, setNewRole] = useState<OrgRoleName>("scorekeeper");
@@ -32,13 +32,17 @@ export function OrganizationDetail() {
     queryKey: ["organizations", organizationId],
     queryFn: () => getOrganization(apiFetch, organizationId),
   });
+  const canViewMembers =
+    orgQuery.data?.viewer_role === "owner" || orgQuery.data?.viewer_role === "organizer";
   const membersQuery = useQuery({
     queryKey: ["organizations", organizationId, "members"],
     queryFn: () => listOrganizationMembers(apiFetch, organizationId),
+    enabled: canViewMembers,
   });
 
   const renameMutation = useMutation({
-    mutationFn: () => updateOrganization(apiFetch, organizationId, nameDraft),
+    mutationFn: () =>
+      updateOrganization(apiFetch, organizationId, (nameDraft ?? orgQuery.data?.name ?? "").trim()),
     onSuccess: (data) =>
       queryClient.setQueryData(
         ["organizations", organizationId],
@@ -103,14 +107,14 @@ export function OrganizationDetail() {
             Organization name
             <input
               type="text"
-              value={nameDraft || org.name}
+              value={nameDraft ?? org.name}
               onChange={(event) => setNameDraft(event.target.value)}
               className="mt-1 block rounded border border-gray-300 px-2 py-1"
             />
           </label>
           <button
             type="button"
-            disabled={renameMutation.isPending}
+            disabled={renameMutation.isPending || (nameDraft ?? org.name).trim() === ""}
             onClick={() => renameMutation.mutate()}
             className="mt-2 rounded border border-gray-300 px-3 py-1.5 text-sm"
           >
@@ -119,53 +123,63 @@ export function OrganizationDetail() {
         </div>
       )}
 
-      <table className="mb-6 w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="border-b border-gray-200 pb-1">Identity</th>
-            <th className="border-b border-gray-200 pb-1">Role</th>
-            {isOwner && <th className="border-b border-gray-200 pb-1" />}
-          </tr>
-        </thead>
-        <tbody>
-          {members.map((member) => (
-            <tr key={member.id}>
-              <td className="py-1">{member.player_uuid}</td>
-              <td className="py-1">
-                {isOwner ? (
-                  <select
-                    value={member.role}
-                    onChange={(event) =>
-                      updateRoleMutation.mutate({ memberId: member.id, role: event.target.value as OrgRoleName })
-                    }
-                    className="rounded border border-gray-300 px-2 py-1"
-                  >
-                    {ROLE_OPTIONS.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  member.role
-                )}
-              </td>
-              {isOwner && (
-                <td className="py-1">
-                  <button
-                    type="button"
-                    onClick={() => removeMemberMutation.mutate(member.id)}
-                    disabled={removeMemberMutation.isPending}
-                    className="rounded border border-gray-300 px-2 py-1 text-xs"
-                  >
-                    Remove
-                  </button>
-                </td>
-              )}
+      {canViewMembers ? (
+        <table className="mb-6 w-full text-left text-sm">
+          <thead>
+            <tr>
+              <th className="border-b border-gray-200 pb-1">Identity</th>
+              <th className="border-b border-gray-200 pb-1">Source system</th>
+              <th className="border-b border-gray-200 pb-1">Role</th>
+              {isOwner && <th className="border-b border-gray-200 pb-1" />}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {members.map((member) => (
+              <tr key={member.id}>
+                <td className="py-1">{member.player_uuid}</td>
+                <td className="py-1">{member.source_system}</td>
+                <td className="py-1">
+                  {isOwner ? (
+                    <select
+                      value={member.role}
+                      onChange={(event) =>
+                        updateRoleMutation.mutate({ memberId: member.id, role: event.target.value as OrgRoleName })
+                      }
+                      className="rounded border border-gray-300 px-2 py-1"
+                    >
+                      {ROLE_OPTIONS.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    member.role
+                  )}
+                </td>
+                {isOwner && (
+                  <td className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => removeMemberMutation.mutate(member.id)}
+                      disabled={removeMemberMutation.isPending}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        org && (
+          <p className="mb-6 text-sm text-gray-600">
+            You don&apos;t have permission to view this organization&apos;s member roster.
+          </p>
+        )
+      )}
 
       {isOwner && (
         <div>
