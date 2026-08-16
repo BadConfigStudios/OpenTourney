@@ -40,3 +40,16 @@ secrets:
   oidcAudience: ""
   oidcJwksUrl: ""
   oidcJwksStatic: ""
+
+zitadel:
+  enabled: false
+  image:
+    repository: ghcr.io/zitadel/zitadel
+    tag: v4.17.1
+    pullPolicy: IfNotPresent
+  externalDomain: "zitadel.opentourney-staging.svc.cluster.local"
+  externalPort: 8080
+  firstInstance:
+    orgName: "OpenTourney"
+    adminUsername: "admin"
+    adminPassword: ""
