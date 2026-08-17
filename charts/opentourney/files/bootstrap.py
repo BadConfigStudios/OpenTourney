@@ -40,6 +40,12 @@ import requests
 
 ZITADEL_BASE = "http://localhost:8080"
 MGMT = f"{ZITADEL_BASE}/management/v1"
+# In-cluster Service DNS name for the Login V2 deployment (see
+# charts/opentourney/templates/zitadel-login-service.yaml). Bare host only --
+# Zitadel's defaultBaseURL() appends /ui/v2/login itself; a pre-suffixed value
+# here produces a double path. Unset (None) when zitadel.login.enabled=false --
+# enable_login_v2_feature() must not run in that case (see main()).
+LOGIN_V2_BASE_URI = os.environ.get("ZITADEL_LOGIN_V2_BASE_URI")
 # Zitadel validates the Host header against ZITADEL_EXTERNALDOMAIN (anti-DNS-rebinding
 # protection) and returns 404 for any request presenting a different Host — including
 # the "localhost:8080" the requests library would otherwise send by default when hitting
@@ -243,6 +249,21 @@ def get_or_create_application(session, project_id, name, app_type, redirect_uris
     return detail.json()["app"]["oidcConfig"]["clientId"]
 
 
+def enable_login_v2_feature(session):
+    # Instance Feature API lives under /v2, not /management/v1 (MGMT) -- a
+    # different base path than every other call in this script.
+    response = session.put(
+        f"{ZITADEL_BASE}/v2/features/instance",
+        json={"loginV2": {"required": True, "baseUri": LOGIN_V2_BASE_URI}},
+    )
+    if not response.ok:
+        print(
+            f"PUT /v2/features/instance -> {response.status_code}: {response.text}",
+            file=sys.stderr,
+        )
+    response.raise_for_status()
+
+
 def find_user_by_username(session, username):
     response = session.post(
         f"{MGMT}/users/_search",
@@ -439,6 +460,12 @@ def main():
         session, project_id, FRONTEND_APP_NAME, "OIDC_APP_TYPE_USER_AGENT", [FRONTEND_APP_REDIRECT_URI]
     )
     print(f"application {FRONTEND_APP_NAME!r} client_id={frontend_client_id}")
+
+    if LOGIN_V2_BASE_URI:
+        enable_login_v2_feature(session)
+        print(f"Login V2 feature enabled, baseUri={LOGIN_V2_BASE_URI}")
+    else:
+        print("ZITADEL_LOGIN_V2_BASE_URI unset (zitadel.login.enabled=false) -- skipping Login V2 feature enable")
 
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)

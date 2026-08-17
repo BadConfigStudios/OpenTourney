@@ -188,6 +188,10 @@ spec:
             # pod lifetime — see bootstrap.py's get_pat_from_secret()/save_pat_to_secret().
             - name: ZITADEL_PAT_SECRET_NAME
               value: {{ printf "%s-zitadel-pat" (include "ot.fullname" .) | quote }}
+            {{- if .Values.zitadel.login.enabled }}
+            - name: ZITADEL_LOGIN_V2_BASE_URI
+              value: {{ printf "http://%s-zitadel-login:3000" (include "ot.fullname" .) | quote }}
+            {{- end }}
           volumeMounts:
             - name: pat
               mountPath: /pat
