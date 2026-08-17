@@ -404,14 +404,6 @@ def main():
         ensure_role(session, project_id, role)
     print(f"roles ensured: {ROLES}")
 
-    client_id = get_or_create_application(session, project_id)
-    # Logged unconditionally (unlike test-user passwords, which are unrecoverable
-    # after creation) since client_id is retrievable via the Management API on any
-    # later run -- this line is a convenience for copy/paste into the next
-    # `helm upgrade --set-string secrets.oidcAudience=<client_id>`, not the only
-    # source of truth.
-    print(f"application {APP_NAME!r} client_id={client_id}")
-
     for role in ROLES:
         user_id = get_or_create_user(session, role)
         ensure_grant(session, user_id, project_id, role)
@@ -419,6 +411,19 @@ def main():
 
     action_id = get_or_create_action(session)
     print(f"action {ACTION_NAME!r} id={action_id}")
+
+    # Ordered after user/grant/action provisioning deliberately: if this call fails
+    # (e.g. Zitadel rejects the redirect URI -- see DEVELOPMENT.md's devMode note),
+    # the more essential provisioning above has already completed and survives a pod
+    # restart via the idempotent get-or-create pattern, instead of a failure here
+    # blocking test users/roles/the roles-claim Action every single retry.
+    client_id = get_or_create_application(session, project_id)
+    # Logged unconditionally (unlike test-user passwords, which are unrecoverable
+    # after creation) since client_id is retrievable via the Management API on any
+    # later run -- this line is a convenience for copy/paste into the next
+    # `helm upgrade --set-string secrets.oidcAudience=<client_id>`, not the only
+    # source of truth.
+    print(f"application {APP_NAME!r} client_id={client_id}")
 
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)
