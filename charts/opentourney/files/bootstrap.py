@@ -257,23 +257,49 @@ def ensure_grant(session, user_id, project_id, role):
 
 
 def get_or_create_action(session):
-    result = api_post(
-        session,
-        "/actions",
-        {
-            "name": ACTION_NAME,
-            "script": ACTION_SOURCE,
-            "timeout": "10s",
-            "allowedToFail": False,
-        },
-    )
+    action_body = {
+        "name": ACTION_NAME,
+        "script": ACTION_SOURCE,
+        "timeout": "10s",
+        "allowedToFail": False,
+    }
+    result = api_post(session, "/actions", action_body)
     if result is not None:
         return result["id"]
     response = session.post(f"{MGMT}/actions/_search", json={})
     response.raise_for_status()
     for action in response.json().get("result", []):
         if action.get("name") == ACTION_NAME:
-            return action["id"]
+            # Unlike every other resource here, an action's own content (its script) is
+            # exactly what changes across bootstrap.py edits — a stale action would
+            # silently keep running its old script forever otherwise. PUT it back to the
+            # current ACTION_SOURCE on every run so a script change actually takes effect
+            # against an already-bootstrapped instance, not just a fresh one.
+            action_id = action["id"]
+            put_response = session.put(f"{MGMT}/actions/{action_id}", json=action_body)
+            if put_response.status_code == 400:
+                # Same "No Changes" idempotency quirk documented on set_trigger below —
+                # PUTting back byte-identical content Zitadel already has returns 400,
+                # not a 200 no-op — but each command has its own distinct error ID
+                # (confirmed live: UpdateAction's is ACTION-dg4t2, not SetTriggerActions'
+                # COMMAND-Nfh52). Treat either as success the same way.
+                try:
+                    body = put_response.json()
+                except ValueError:
+                    body = {}
+                details = body.get("details") or []
+                no_changes = body.get("code") == 9 and any(
+                    detail.get("id") in ("COMMAND-Nfh52", "ACTION-dg4t2") for detail in details
+                )
+                if no_changes:
+                    return action_id
+            if not put_response.ok:
+                print(
+                    f"PUT /actions/{action_id} -> {put_response.status_code}: {put_response.text}",
+                    file=sys.stderr,
+                )
+            put_response.raise_for_status()
+            return action_id
     raise RuntimeError(f"action {ACTION_NAME!r} 409'd on create but not found in search")
 
 
