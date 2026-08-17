@@ -1,0 +1,15 @@
+{{- if .Values.zitadel.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: zitadel
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/component: zitadel
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - port: 8080
+      targetPort: 8080
+{{- end }}

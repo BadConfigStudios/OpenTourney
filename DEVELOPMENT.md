@@ -76,6 +76,24 @@ alone:
   - `secrets.oidcJwksUrl` **or** `secrets.oidcJwksStatic` — one of the two,
     for JWKS key resolution
 
+  `values.staging.yaml` now sets `zitadel.enabled: true`, so every
+  `helm upgrade` documented below also requires:
+  - `zitadel.masterkey` — exactly 32 characters. **Generate this once and
+    never regenerate it.** Zitadel cannot decrypt data encrypted under a
+    previous masterkey, so passing a different value on a later deploy
+    permanently locks the existing instance out of its own data. Before
+    generating a new one, check whether it's already stored: the chart
+    writes it into the `<release>-opentourney-zitadel-secrets` Secret's
+    `ZITADEL_MASTERKEY` key —
+    `kubectl -n opentourney-staging get secret <release>-opentourney-zitadel-secrets -o jsonpath='{.data.ZITADEL_MASTERKEY}' | base64 -d`
+    — and reuse that value rather than minting a fresh one.
+  - `zitadel.firstInstance.adminPassword` — Zitadel's complexity policy
+    (8+ chars, upper, lower, digit, symbol). Only consumed by Zitadel's
+    one-time FirstInstance bootstrap, so it matters far less on repeat
+    deploys than the masterkey does, but the chart's `required` guard still
+    demands a value on every render since the whole `zitadel:` block is
+    unconditionally templated when `zitadel.enabled=true`.
+
 ### Namespace & values
 
 - Namespace: `opentourney-staging`
@@ -117,7 +135,9 @@ alone:
      --set-string secrets.databaseUrl=<database-url> \
      --set-string secrets.oidcIssuer=<oidc-issuer> \
      --set-string secrets.oidcAudience=<oidc-audience> \
-     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json>
+     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json> \
+     --set-string zitadel.masterkey=<32-char-masterkey> \
+     --set-string zitadel.firstInstance.adminPassword=<admin-password>
    ```
 
    `secrets.databaseUrl`, `secrets.oidcIssuer`, and `secrets.oidcAudience`
@@ -126,7 +146,18 @@ alone:
    itself rather than silently deploying a broken release. Use
    `--set-string secrets.oidcJwksUrl=<oidc-jwks-url>` instead of
    `secrets.oidcJwksStatic` if the issuer's JWKS should be fetched live
-   rather than pinned.
+   rather than pinned. `zitadel.masterkey` and
+   `zitadel.firstInstance.adminPassword` are likewise required now that
+   `values.staging.yaml` sets `zitadel.enabled: true` — see the Prerequisites
+   note above on `zitadel.masterkey` before ever changing this value; reuse
+   the already-stored one, don't regenerate.
+
+   `zitadel.enabled` defaults to `true` via `values.staging.yaml`'s own
+   `-f` layer above, so it doesn't need a `--set` — but this also means
+   running this same command with `zitadel.enabled` accidentally overridden
+   to `false` (e.g. a stray `--set zitadel.enabled=false`) deletes the
+   Zitadel Deployment/Service/Secret and drops the `zitadel` Postgres user,
+   since the whole component is guarded by a single `{{- if .Values.zitadel.enabled }}`.
 
    For a quick image-only iteration once the release already exists, use
    `kubectl set image` instead of a full `helm upgrade`:

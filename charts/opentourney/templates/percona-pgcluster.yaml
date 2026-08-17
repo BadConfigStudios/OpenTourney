@@ -35,4 +35,10 @@ spec:
       databases:
         - opentourney
       options: "SUPERUSER"
+    {{- if .Values.zitadel.enabled }}
+    - name: zitadel
+      databases:
+        - zitadel
+      options: "SUPERUSER"
+    {{- end }}
 {{- end }}

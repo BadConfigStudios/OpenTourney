@@ -1,0 +1,46 @@
+{{- if .Values.zitadel.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+---
+# Scoped to this namespace only, matching this chart's existing staging-appropriate
+# breadth convention (e.g. the Postgres users' "SUPERUSER" option) rather than a
+# narrower per-resource-name grant. Grants get/create/update on Secrets so the
+# bootstrap sidecar can persist the FirstInstance PAT to a Secret on first
+# acquisition and read it back on every subsequent pod start (see bootstrap.py).
+#
+# Split into two rules: create is broad (can't be scoped to a name since the object
+# doesn't exist yet), but get/update are restricted to the PAT secret only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "update"]
+    resourceNames: ["{{ printf "%s-zitadel-pat" (include "ot.fullname" .) }}"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ot.fullname" . }}-zitadel
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "ot.fullname" . }}-zitadel
+    namespace: {{ .Release.Namespace }}
+{{- end }}
