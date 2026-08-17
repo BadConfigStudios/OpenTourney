@@ -14,6 +14,6 @@ data:
   .env: |-
     ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
     AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}"
-    ZITADEL_API_URL="http://{{ include "ot.fullname" . }}-zitadel:8080"
+    ZITADEL_API_URL="http://zitadel:8080"
     CUSTOM_REQUEST_HEADERS="Host:${ZITADEL_EXTERNALDOMAIN},X-Zitadel-Public-Host:${ZITADEL_EXTERNALDOMAIN}"
 {{- end }}

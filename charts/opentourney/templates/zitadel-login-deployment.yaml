@@ -34,7 +34,7 @@ spec:
             - sh
             - -c
             - |
-              until curl -sf http://{{ include "ot.fullname" . }}-zitadel:8080/debug/healthz; do
+              until curl -sf http://zitadel:8080/debug/healthz; do
                 echo "waiting for zitadel core..."
                 sleep 5
               done
