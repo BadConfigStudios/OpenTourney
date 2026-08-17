@@ -11,6 +11,9 @@ metadata:
 # narrower per-resource-name grant. Grants get/create/update on Secrets so the
 # bootstrap sidecar can persist the FirstInstance PAT to a Secret on first
 # acquisition and read it back on every subsequent pod start (see bootstrap.py).
+#
+# Split into two rules: create is broad (can't be scoped to a name since the object
+# doesn't exist yet), but get/update are restricted to the PAT secret only.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -20,7 +23,11 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "create", "update"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "update"]
+    resourceNames: ["{{ printf "%s-zitadel-pat" (include "ot.fullname" .) }}"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
