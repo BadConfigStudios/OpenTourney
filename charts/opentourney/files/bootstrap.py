@@ -191,12 +191,27 @@ def get_or_create_action(session):
 
 
 def set_trigger(session, flow_type, trigger_type, action_id):
-    # Replace, not append — naturally idempotent, no 409 handling needed.
+    # SetTriggerActions is NOT naturally idempotent the way it first appears: calling it
+    # again with the exact actionIds it already has returns 400 COMMAND-Nfh52 "No Changes"
+    # (confirmed live), not a 200 no-op. Treat that specific response as success, the same
+    # way api_post() treats a plain 409 as a no-op — but match precisely on the body's
+    # code/id fields so a genuinely different 400 (a real bug) still raises.
     path = f"/flows/{flow_type}/trigger/{trigger_type}"
     response = session.post(
         f"{MGMT}{path}",
         json={"actionIds": [action_id]},
     )
+    if response.status_code == 400:
+        try:
+            body = response.json()
+        except ValueError:
+            body = {}
+        details = body.get("details") or []
+        no_changes = body.get("code") == 9 and any(
+            detail.get("id") == "COMMAND-Nfh52" for detail in details
+        )
+        if no_changes:
+            return  # trigger already set to this action — idempotent no-op
     if not response.ok:
         # Mirror api_post's diagnostic: Zitadel's gRPC-gateway error bodies name the
         # offending field/condition directly (e.g. COMMAND-xxxx codes) — without this,
