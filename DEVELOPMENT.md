@@ -149,15 +149,20 @@ alone:
    scheme and suffixed with its port (e.g.
    `http://zitadel.opentourney-staging.svc.cluster.local:8080`) — in-cluster
    only, since no public hostname exists yet (see Namespace & values below).
+   `<zitadel-issuer-hostname>` used in the steps below is just the bare
+   hostname part of this value (e.g. `zitadel.opentourney-staging.svc.cluster.local`).
    `<client-id-from-bootstrap-log>` comes from the Zitadel bootstrap
    sidecar's own log line, `application 'opentourney-cli' client_id=...`
    (`kubectl -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`).
 
-   **Ordering gotcha, same shape as the masterkey caveat below:** on a
-   *fresh* Zitadel stand-up, the client doesn't exist until after Zitadel's
-   pod comes up and its bootstrap sidecar runs — so `secrets.oidcAudience`
-   can't be correct on the very first `helm upgrade` in a new namespace.
-   Deploy once, read the logged `client_id`, then `helm upgrade` again with
+   **Ordering gotcha:** on a *fresh* Zitadel stand-up, the OIDC client
+   doesn't exist until after Zitadel's pod comes up and its bootstrap sidecar
+   runs, so `secrets.oidcAudience` can't be the correct real value on the very
+   first `helm upgrade` in a new namespace. Pass any placeholder string for
+   that first deploy (it's not Helm-`required`-enforced like
+   `secrets.databaseUrl`, so the deploy won't fail); the backend only needs to
+   validate it once Zitadel itself is running anyway. After the first deploy
+   succeeds, read the logged `client_id`, then `helm upgrade` again with
    `secrets.oidcAudience` set correctly. Because `get_or_create_application()`
    is idempotent, ordinary re-deploys against an already-bootstrapped
    instance never hit this — only a full teardown/rebuild does. `zitadel.masterkey` and
@@ -242,11 +247,17 @@ not just that the Helm secret values look right.
 
    Expected: a JSON body containing `access_token`.
 
-6. Call the backend with it:
+6. Port-forward the backend service (no public hostname yet):
+
+   ```bash
+   kubectl --context mcgee-local -n opentourney-staging port-forward svc/backend 8000:8000
+   ```
+
+7. Call the backend with it:
 
    ```bash
    curl -s -H "Authorization: Bearer <access_token>" \
-     http://<backend-staging-url>/events
+     http://localhost:8000/events
    ```
 
    Expected: `200`, not `401`. A `401` here most often means
