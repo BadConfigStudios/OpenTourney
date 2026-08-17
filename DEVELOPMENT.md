@@ -205,19 +205,16 @@ Confirms the backend actually accepts a Zitadel-issued token end to end
 (role claim, `source_system` claim, signature/issuer/audience validation) —
 not just that the Helm secret values look right.
 
-**Known gap:** Zitadel v4's Login V2 UI is a separate, standalone container
-that this chart does not yet deploy — the core `zitadel` binary no longer
-serves login pages itself. As a result, step 3 below (opening the authorize
-URL in a browser and logging in) currently cannot complete; it 404s with
-`{"code":5,"message":"Not Found"}` instead of redirecting to a login page.
-Tracked in [issue #82](https://github.com/badconfigstudios/opentourney/issues/82)
-(Phase 16 scope). Steps 1-2 and 5-7 remain the correct recipe once Login V2
-is deployed — only step 3 is currently blocked.
+Since Phase 16 PR1, Login V2 is deployed as its own chart component
+(`charts/opentourney/templates/zitadel-login-*.yaml`) and core Zitadel is
+configured to redirect `/oauth/v2/authorize` into it — step 3 below now
+completes.
 
-1. Port-forward Zitadel:
+1. Port-forward Zitadel core and the Login V2 UI (two separate services):
 
    ```bash
    kubectl --context mcgee-local -n opentourney-staging port-forward svc/zitadel 8080:8080
+   kubectl --context mcgee-local -n opentourney-staging port-forward svc/opentourney-staging-opentourney-zitadel-login 3000:3000
    ```
 
 2. Zitadel checks the request `Host` header against `ZITADEL_EXTERNALDOMAIN`
@@ -238,11 +235,13 @@ is deployed — only step 3 is currently blocked.
    ```
 
    ```
-   http://<zitadel-issuer-hostname>:8080/oauth/v2/authorize?client_id=<client-id-from-bootstrap-log>&redirect_uri=http://localhost:8765/callback&response_type=code&scope=openid+profile&code_challenge=<challenge>&code_challenge_method=S256
+   http://<zitadel-issuer-hostname>:8080/oauth/v2/authorize?client_id=<opentourney-cli-client-id-from-bootstrap-log>&redirect_uri=http://localhost:8765/callback&response_type=code&scope=openid+profile&code_challenge=<challenge>&code_challenge_method=S256
    ```
 
-   Log in as `organizer@staging.local` with the password the bootstrap
-   sidecar logged at creation time.
+   The browser should now redirect into `http://localhost:3000/ui/v2/login/...`
+   (via the port-forward from step 1) instead of 404ing. Log in as
+   `organizer@staging.local` with the password the bootstrap sidecar logged
+   at creation time.
 
 4. The browser redirects to `http://localhost:8765/callback?code=...`
    (404 in the browser — nothing is listening, that's expected). Copy the
@@ -291,17 +290,21 @@ is deployed — only step 3 is currently blocked.
    confirm with
    `kubectl --context mcgee-local -n opentourney-staging get secret <release>-opentourney-secrets -o yaml`.
 
-**Troubleshooting the authorize call (separate, secondary concern):** this
-note does not explain the current Login-V2-missing failure above (a 404
-`{"code":5,"message":"Not Found"}`) — it covers a *different* symptom that
-may surface later, once Login V2 is deployed and step 3 can actually reach
-a login page. If Zitadel then rejects the redirect URI outright (400 on
-step 3, before any login page renders), the client likely needs
-`"devMode": true` added to `bootstrap.py`'s `get_or_create_application()`
-request body — Zitadel's default posture requires HTTPS redirect URIs for
+**Troubleshooting the authorize call:** if Zitadel rejects the redirect URI
+outright (400 on step 3, before any login page renders), the client likely
+needs `"devMode": true` added to `get_or_create_application()`'s request
+body — Zitadel's default posture requires HTTPS redirect URIs for
 non-loopback apps, and this deployment (`ZITADEL_EXTERNALSECURE=false`)
 runs entirely over HTTP. Add the field, re-run the bootstrap Job/pod
 restart, and retry.
+
+**Troubleshooting a double `/ui/v2/login/ui/v2/login` redirect:** the
+bootstrap sidecar's `enable_login_v2_feature()` sets `loginV2.baseUri` to
+the bare login-service host (`http://<release>-zitadel-login:3000`) —
+Zitadel's `defaultBaseURL()` appends `/ui/v2/login` itself. If the browser
+lands on a doubled path, check
+`kubectl -n opentourney-staging exec deploy/opentourney-staging-opentourney-zitadel -c bootstrap -- env | grep ZITADEL_LOGIN_V2_BASE_URI`
+for a stray `/ui/v2/login` suffix and re-run the bootstrap sidecar.
 
 ### Known gotchas
 
