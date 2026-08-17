@@ -47,6 +47,19 @@ zitadel:
     repository: ghcr.io/zitadel/zitadel
     tag: v4.17.1
     pullPolicy: IfNotPresent
+  # Zitadel v4's core binary no longer serves login pages itself -- every
+  # /oauth/v2/authorize redirects to this separate service. Defaults to
+  # enabled whenever zitadel.enabled is true: there is no supported way to
+  # complete a real login (browser or curl) without it.
+  login:
+    enabled: true
+    image:
+      repository: ghcr.io/zitadel/zitadel-login
+      # Pinned to the same release as zitadel.image.tag above -- Zitadel
+      # versions core and Login V2 together. Confirm this tag exists at
+      # deploy time (Task 8); bump both tags together on future upgrades.
+      tag: v4.17.1
+      pullPolicy: IfNotPresent
   # Empty by default so this reusable chart doesn't silently hardcode a namespace name
   # (this phase's DECISIONS.md 2026-08-09 calls for one Zitadel install per customer
   # namespace). Templates fall back to zitadel.<Release.Namespace>.svc.cluster.local when
