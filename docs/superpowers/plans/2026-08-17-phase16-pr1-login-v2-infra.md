@@ -340,7 +340,10 @@ data:
   .env: |-
     ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
     AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}"
-    ZITADEL_API_URL="http://{{ include "ot.fullname" . }}-zitadel:8080"
+    # NOT ot.fullname-prefixed: charts/opentourney/templates/zitadel-service.yaml
+    # names core Zitadel's Service the bare literal "zitadel" (a pre-existing
+    # Phase 14 exception to this chart's usual naming, unrelated to Login V2).
+    ZITADEL_API_URL="http://zitadel:8080"
     CUSTOM_REQUEST_HEADERS="Host:${ZITADEL_EXTERNALDOMAIN},X-Zitadel-Public-Host:${ZITADEL_EXTERNALDOMAIN}"
 {{- end }}
 ```
@@ -386,7 +389,7 @@ spec:
             - sh
             - -c
             - |
-              until curl -sf http://{{ include "ot.fullname" . }}-zitadel:8080/debug/healthz; do
+              until curl -sf http://zitadel:8080/debug/healthz; do
                 echo "waiting for zitadel core..."
                 sleep 5
               done
@@ -867,7 +870,7 @@ completes.
 1. Port-forward Zitadel core and the Login V2 UI (two separate services):
 
    ```bash
-   kubectl --context mcgee-local -n opentourney-staging port-forward svc/opentourney-staging-opentourney-zitadel 8080:8080
+   kubectl --context mcgee-local -n opentourney-staging port-forward svc/zitadel 8080:8080
    kubectl --context mcgee-local -n opentourney-staging port-forward svc/opentourney-staging-opentourney-zitadel-login 3000:3000
    ```
 
@@ -975,7 +978,7 @@ Expected: three lines — `application 'opentourney-cli' client_id=...`, `applic
 - [ ] **Step 4: Confirm `/oauth/v2/authorize` redirects instead of 404ing**
 
 ```bash
-kubectl --context mcgee-local -n opentourney-staging port-forward svc/opentourney-staging-opentourney-zitadel 8080:8080 &
+kubectl --context mcgee-local -n opentourney-staging port-forward svc/zitadel 8080:8080 &
 curl -s -o /dev/null -w "%{http_code}\n" --resolve zitadel.opentourney-staging.svc.cluster.local:8080:127.0.0.1 \
   "http://zitadel.opentourney-staging.svc.cluster.local:8080/oauth/v2/authorize?client_id=x&redirect_uri=http://localhost:8765/callback&response_type=code&scope=openid&code_challenge=x&code_challenge_method=S256"
 ```
