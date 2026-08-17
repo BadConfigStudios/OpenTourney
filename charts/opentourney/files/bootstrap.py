@@ -192,10 +192,16 @@ def get_or_create_action(session):
 
 def set_trigger(session, flow_type, trigger_type, action_id):
     # Replace, not append — naturally idempotent, no 409 handling needed.
+    path = f"/flows/{flow_type}/trigger/{trigger_type}"
     response = session.post(
-        f"{MGMT}/flows/{flow_type}/trigger/{trigger_type}",
+        f"{MGMT}{path}",
         json={"actionIds": [action_id]},
     )
+    if not response.ok:
+        # Mirror api_post's diagnostic: Zitadel's gRPC-gateway error bodies name the
+        # offending field/condition directly (e.g. COMMAND-xxxx codes) — without this,
+        # raise_for_status() below only surfaces the status code, not the reason.
+        print(f"POST {path} -> {response.status_code}: {response.text}", file=sys.stderr)
     response.raise_for_status()
 
 
