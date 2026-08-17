@@ -205,9 +205,11 @@ def get_or_create_application(session, project_id):
         "redirectUris": [APP_REDIRECT_URI],
         "responseTypes": ["OIDC_RESPONSE_TYPE_CODE"],
         "grantTypes": ["OIDC_GRANT_TYPE_AUTHORIZATION_CODE"],
-        # Public client (no secret) using PKCE, matching both this phase's manual
-        # curl-based Authorization Code flow and the frontend's future oidc-client-ts
-        # integration (Phase 16) -- same client type/flow, no throwaway app to replace.
+        # Public client (no secret) using PKCE, appropriate for this phase's manual
+        # curl-based Authorization Code flow. Note: OIDC_APP_TYPE_NATIVE is for
+        # loopback/custom-scheme redirect URIs (RFC 8252), not what Zitadel
+        # recommends for a browser SPA (OIDC_APP_TYPE_USER_AGENT) -- Phase 16's
+        # frontend oidc-client-ts integration will likely need a different app.
         "appType": "OIDC_APP_TYPE_NATIVE",
         "authMethodType": "OIDC_AUTH_METHOD_TYPE_NONE",
         "version": "OIDC_VERSION_1_0",

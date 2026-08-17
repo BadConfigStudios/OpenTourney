@@ -153,7 +153,7 @@ alone:
    hostname part of this value (e.g. `zitadel.opentourney-staging.svc.cluster.local`).
    `<client-id-from-bootstrap-log>` comes from the Zitadel bootstrap
    sidecar's own log line, `application 'opentourney-cli' client_id=...`
-   (`kubectl -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`).
+   (`kubectl --context mcgee-local -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`).
 
    **Ordering gotcha:** on a *fresh* Zitadel stand-up, the OIDC client
    doesn't exist until after Zitadel's pod comes up and its bootstrap sidecar
@@ -187,11 +187,32 @@ alone:
    kubectl --context mcgee-local -n opentourney-staging rollout status deployment/opentourney-staging-opentourney-backend
    ```
 
+4. **Verify** via `kubectl port-forward` (no public hostname yet):
+
+   ```bash
+   kubectl --context mcgee-local -n opentourney-staging port-forward svc/backend 8000:8000
+   curl http://localhost:8000/healthz
+   ```
+
+   For the deeper auth-path check (a real Zitadel-issued token accepted end
+   to end), see "Verifying a real Zitadel login" below.
+
+5. **Only then** open/merge the PR to `main`.
+
 ### Verifying a real Zitadel login
 
 Confirms the backend actually accepts a Zitadel-issued token end to end
 (role claim, `source_system` claim, signature/issuer/audience validation) —
 not just that the Helm secret values look right.
+
+**Known gap:** Zitadel v4's Login V2 UI is a separate, standalone container
+that this chart does not yet deploy — the core `zitadel` binary no longer
+serves login pages itself. As a result, step 3 below (opening the authorize
+URL in a browser and logging in) currently cannot complete; it 404s with
+`{"code":5,"message":"Not Found"}` instead of redirecting to a login page.
+Tracked in [issue #82](https://github.com/badconfigstudios/opentourney/issues/82)
+(Phase 16 scope). Steps 1-2 and 5-7 remain the correct recipe once Login V2
+is deployed — only step 3 is currently blocked.
 
 1. Port-forward Zitadel:
 
@@ -217,13 +238,7 @@ not just that the Helm secret values look right.
    ```
 
    ```
-   http://<zitadel-issuer-hostname>:8080/oauth/v2/authorize
-     ?client_id=<client-id-from-bootstrap-log>
-     &redirect_uri=http://localhost:8765/callback
-     &response_type=code
-     &scope=openid profile
-     &code_challenge=<challenge>
-     &code_challenge_method=S256
+   http://<zitadel-issuer-hostname>:8080/oauth/v2/authorize?client_id=<client-id-from-bootstrap-log>&redirect_uri=http://localhost:8765/callback&response_type=code&scope=openid+profile&code_challenge=<challenge>&code_challenge_method=S256
    ```
 
    Log in as `organizer@staging.local` with the password the bootstrap
@@ -237,7 +252,6 @@ not just that the Helm secret values look right.
 
    ```bash
    curl -s -X POST http://<zitadel-issuer-hostname>:8080/oauth/v2/token \
-     -H 'Host: <zitadel-issuer-hostname>' \
      -d grant_type=authorization_code \
      -d code=<code-from-step-4> \
      -d redirect_uri=http://localhost:8765/callback \
@@ -265,9 +279,25 @@ not just that the Helm secret values look right.
    bootstrap log's `client_id`), or `secrets.oidcIssuer`/`oidcJwksUrl` are
    pointed at the wrong host.
 
-**Troubleshooting the authorize call:** if Zitadel rejects the redirect URI
-outright (400 on step 3, before any login page renders), the client likely
-needs `"devMode": true` added to Task 1's `get_or_create_application()`
+   Also check: `build_jwks_provider` (`backend/app/auth/jwks.py`) checks
+   `OIDC_JWKS_STATIC` first and returns early if it's set, silently
+   overriding `OIDC_JWKS_URL` even when the URL is correctly configured.
+   `charts/opentourney/templates/secret.yaml` renders both keys into the
+   Secret whenever both values are non-empty (e.g. an operator reusing an
+   old `--set-string secrets.oidcJwksStatic=...` from shell history, or a
+   `helm upgrade --reuse-values` carrying a stale value forward), so if
+   `OIDC_JWKS_STATIC` is still present in the backend Secret it takes
+   precedence over `OIDC_JWKS_URL` and the static keys silently win;
+   confirm with
+   `kubectl --context mcgee-local -n opentourney-staging get secret <release>-opentourney-secrets -o yaml`.
+
+**Troubleshooting the authorize call (separate, secondary concern):** this
+note does not explain the current Login-V2-missing failure above (a 404
+`{"code":5,"message":"Not Found"}`) — it covers a *different* symptom that
+may surface later, once Login V2 is deployed and step 3 can actually reach
+a login page. If Zitadel then rejects the redirect URI outright (400 on
+step 3, before any login page renders), the client likely needs
+`"devMode": true` added to `bootstrap.py`'s `get_or_create_application()`
 request body — Zitadel's default posture requires HTTPS redirect URIs for
 non-loopback apps, and this deployment (`ZITADEL_EXTERNALSECURE=false`)
 runs entirely over HTTP. Add the field, re-run the bootstrap Job/pod
