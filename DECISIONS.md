@@ -448,3 +448,11 @@ new frontend dependency — not staging-only despite the trigger, since Zitadel
 and prod's eventual Google/Apple/Facebook federation both speak standard
 OIDC Authorization Code + PKCE; the same client plumbing is very likely
 reused for FR30 rather than thrown away.
+
+Alternatives considered for the new dependency: `react-oidc-context` (a
+thinner React-hooks wrapper around the same `oidc-client-ts` engine —
+rejected, more opinionated API than needed, and auth logic isn't
+guaranteed to stay React-component-local); hand-rolled fetch-based
+Authorization Code + PKCE (rejected, zero new dependency but reinvents a
+solved problem and drops silent-renew support for free). `oidc-client-ts`
+confirmed with the owner 2026-08-17.

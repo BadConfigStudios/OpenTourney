@@ -61,7 +61,10 @@ inventing new architecture.
   containing `"organizer"` for the Organizer test account, empty/other for
   Scorekeeper and Player (matching how `mint_test_token.py`'s `--organizer`
   flag works today — scorekeeper/player authorization is resolved via
-  org-membership DB state, not the JWT itself).
+  org-membership DB state, not the JWT itself). `identity_from_claims` also
+  requires a `source_system` claim (part of the composite key every
+  `OrganizationMember`/`PodRole` grant is keyed on) — the Complement Token
+  Action asserts a fixed `source_system: "zitadel"` alongside `roles`.
 
 ## Session / expiry behavior
 
