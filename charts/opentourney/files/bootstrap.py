@@ -17,7 +17,18 @@ minted by Zitadel's own FirstInstance bootstrap, written to /pat/pat.txt):
 Idempotent: every create call treats a 409 ("already exists") response as a
 no-op success, then resolves the existing resource's ID via a _search call
 so re-running this script (e.g. on every Pod restart / helm upgrade) is safe.
+
+PAT durability: Zitadel's FirstInstance bootstrap that mints the PAT at
+/pat/pat.txt only ever runs once per Postgres backing store — any pod
+replacement after that first run permanently loses the PAT with no recovery
+short of a database reset. To make pod restarts safe, this script persists
+the PAT to a Kubernetes Secret (name in ZITADEL_PAT_SECRET_NAME) on first
+successful acquisition, via the Kubernetes API server reachable in-cluster
+through the ServiceAccount token/CA mounted at
+/var/run/secrets/kubernetes.io/serviceaccount/, and checks that Secret
+before ever waiting on the emptyDir file again.
 """
+import base64
 import os
 import secrets
 import string
@@ -37,6 +48,15 @@ PAT_PATH = "/pat/pat.txt"
 ROLES = ["organizer", "scorekeeper", "player"]
 PROJECT_NAME = "OpenTourney"
 ACTION_NAME = "addRolesClaim"
+
+# --- PAT persistence (Kubernetes Secret) -----------------------------------------------
+SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
+K8S_API = "https://{}:{}".format(
+    os.environ.get("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc"),
+    os.environ.get("KUBERNETES_SERVICE_PORT", "443"),
+)
+PAT_SECRET_NAME = os.environ["ZITADEL_PAT_SECRET_NAME"]
+PAT_SECRET_KEY = "pat"
 
 ACTION_SOURCE = """
 function addRolesClaim(ctx, api) {
@@ -61,6 +81,62 @@ def wait_for_pat(timeout_seconds=300):
                 return pat
         time.sleep(2)
     raise TimeoutError(f"{PAT_PATH} did not appear within {timeout_seconds}s")
+
+
+def _k8s_session():
+    """A requests.Session authenticated as this pod's ServiceAccount, talking
+    directly to the in-cluster Kubernetes API server (no client library — matches
+    this script's existing plain-`requests` footprint)."""
+    session = requests.Session()
+    with open(f"{SA_DIR}/token") as f:
+        token = f.read().strip()
+    session.headers["Authorization"] = f"Bearer {token}"
+    session.verify = f"{SA_DIR}/ca.crt"
+    return session
+
+
+def _k8s_namespace():
+    with open(f"{SA_DIR}/namespace") as f:
+        return f.read().strip()
+
+
+def _pat_secret_url(namespace):
+    return f"{K8S_API}/api/v1/namespaces/{namespace}/secrets/{PAT_SECRET_NAME}"
+
+
+def get_pat_from_secret():
+    """Returns the PAT from the persisted Secret, or None if it doesn't exist yet
+    (true-first-run case, or a pre-fix instance that never got one)."""
+    session = _k8s_session()
+    response = session.get(_pat_secret_url(_k8s_namespace()))
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    encoded = response.json().get("data", {}).get(PAT_SECRET_KEY)
+    if not encoded:
+        return None
+    return base64.b64decode(encoded).decode().strip()
+
+
+def save_pat_to_secret(pat):
+    """Persists the PAT to a Secret so future pod restarts never need Zitadel's
+    one-shot FirstInstance bootstrap to re-run."""
+    session = _k8s_session()
+    namespace = _k8s_namespace()
+    body = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {"name": PAT_SECRET_NAME},
+        "type": "Opaque",
+        "data": {PAT_SECRET_KEY: base64.b64encode(pat.encode()).decode()},
+    }
+    response = session.post(
+        f"{K8S_API}/api/v1/namespaces/{namespace}/secrets", json=body
+    )
+    if response.status_code == 409:
+        # Created concurrently (or by a previous partial run) — update in place instead.
+        response = session.put(_pat_secret_url(namespace), json=body)
+    response.raise_for_status()
 
 
 def api_post(session, path, json_body):
@@ -140,6 +216,11 @@ def find_user_by_username(session, username):
 
 
 def get_or_create_user(session, role):
+    # The generated password is printed to stdout only on the create path (below) —
+    # a 409/already-exists re-run prints nothing, since the password isn't retrievable
+    # from Zitadel after creation. If a test user's logged password is lost (log scrolled
+    # away, container restarted before it was captured), it is NOT recoverable from logs;
+    # reset it via the Zitadel Console (using the FirstInstance admin credentials) instead.
     username = f"{role}@staging.local"
     password = generate_password()
     body = {
@@ -221,7 +302,24 @@ def set_trigger(session, flow_type, trigger_type, action_id):
 
 
 def main():
-    pat = wait_for_pat()
+    pat = get_pat_from_secret()
+    if pat:
+        print(f"using PAT persisted in Secret {PAT_SECRET_NAME!r} (skipping wait_for_pat)")
+    else:
+        try:
+            pat = wait_for_pat()
+        except TimeoutError as exc:
+            # No Secret yet AND no emptyDir file appeared: either this instance was
+            # already bootstrapped before this persistence fix existed and its PAT is
+            # unrecoverable, or something upstream is broken. Either way, looping on
+            # wait_for_pat() again on the next restart wouldn't help — exit cleanly
+            # (the container still parks via `sleep infinity` in the chart's command)
+            # rather than raising an unhandled exception into the logs.
+            print(f"{exc}; already bootstrapped or PAT never appeared, nothing to do")
+            sys.exit(0)
+        save_pat_to_secret(pat)
+        print(f"persisted PAT to Secret {PAT_SECRET_NAME!r} for future pod restarts")
+
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {pat}"
     session.headers["Host"] = ZITADEL_EXTERNAL_DOMAIN

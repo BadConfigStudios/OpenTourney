@@ -1,3 +1,6 @@
+{{- if and .Values.zitadel.enabled (not .Values.percona.enabled) }}
+{{- fail "zitadel.enabled=true requires percona.enabled=true (Zitadel's Postgres user is declared on the PerconaPGCluster)" }}
+{{- end }}
 {{- if .Values.zitadel.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -17,7 +20,14 @@ spec:
       labels:
         app.kubernetes.io/component: zitadel
         app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        # Ties the pod template to the bootstrap script's content so a bootstrap.py edit
+        # + `helm upgrade` actually restarts the pod and picks up the fix. Safe now that the
+        # PAT is persisted to a Secret (see the "bootstrap" container below) rather than only
+        # living in the emptyDir — a pod replacement no longer loses the one-shot credential.
+        checksum/bootstrap-configmap: {{ include (print $.Template.BasePath "/zitadel-bootstrap-configmap.yaml") . | sha256sum }}
     spec:
+      serviceAccountName: {{ include "ot.fullname" . }}-zitadel
       # Disabled: the Service is intentionally named "zitadel" (see zitadel-service.yaml), which
       # causes kubelet to inject a legacy Docker-links env var ZITADEL_PORT=tcp://<clusterIP>:8080
       # into this pod. That collides with Zitadel's own ZITADEL_PORT config field, which expects a
@@ -47,7 +57,7 @@ spec:
                 name: {{ include "ot.fullname" . }}-zitadel-secrets
           env:
             - name: ZITADEL_EXTERNALDOMAIN
-              value: {{ .Values.zitadel.externalDomain | quote }}
+              value: {{ .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) | quote }}
             - name: ZITADEL_EXTERNALPORT
               value: {{ .Values.zitadel.externalPort | quote }}
             - name: ZITADEL_EXTERNALSECURE
@@ -101,8 +111,13 @@ spec:
               value: "bootstrap-automation"
             - name: ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME
               value: "bootstrap-automation"
+            # 1 year out, not the original ~4-year 2030 date: the PAT is now durably persisted
+            # to a Secret on first acquisition (see the "bootstrap" container below) and reused
+            # across pod restarts, so it functions as the ongoing bootstrap-sidecar credential
+            # rather than a one-shot value — a long expiry still makes sense, but a bounded,
+            # renewable-on-purpose window is safer than a near-decade-long token.
             - name: ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE
-              value: "2030-01-01T00:00:00Z"
+              value: "2027-08-16T00:00:00Z"
             - name: ZITADEL_FIRSTINSTANCE_PATPATH
               value: "/pat/pat.txt"
           ports:
@@ -121,14 +136,23 @@ spec:
             periodSeconds: 30
         - name: bootstrap
           image: python:3.12-alpine
-          command: ["sh", "-c", "pip install --no-cache-dir requests && python /scripts/bootstrap.py"]
+          # `;` before `sleep infinity`, not `&&`: the container must park after bootstrap.py
+          # exits on EITHER path (success, or a wait_for_pat() timeout when already bootstrapped)
+          # rather than exiting itself. A Deployment can't set restartPolicy per-container, so an
+          # exiting container restart-loops forever, which keeps the pod's Ready condition false
+          # and pulls it out of svc/zitadel's endpoints even though the zitadel container is healthy.
+          command: ["sh", "-c", "pip install --no-cache-dir requests==2.32.3 && python /scripts/bootstrap.py; sleep infinity"]
           env:
             # Zitadel validates the request Host header against ZITADEL_EXTERNALDOMAIN
             # (anti-DNS-rebinding protection) and 404s otherwise. The sidecar connects
             # via localhost:8080 (same pod) but must still present the external domain
             # as the Host header for every Management API call.
             - name: ZITADEL_EXTERNAL_DOMAIN
-              value: {{ .Values.zitadel.externalDomain | quote }}
+              value: {{ .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) | quote }}
+            # Secret used to durably persist the FirstInstance-minted PAT beyond the emptyDir's
+            # pod lifetime — see bootstrap.py's get_pat_from_secret()/save_pat_to_secret().
+            - name: ZITADEL_PAT_SECRET_NAME
+              value: {{ printf "%s-zitadel-pat" (include "ot.fullname" .) | quote }}
           volumeMounts:
             - name: pat
               mountPath: /pat

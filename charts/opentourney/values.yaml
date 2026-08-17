@@ -47,7 +47,13 @@ zitadel:
     repository: ghcr.io/zitadel/zitadel
     tag: v4.17.1
     pullPolicy: IfNotPresent
-  externalDomain: "zitadel.opentourney-staging.svc.cluster.local"
+  # Empty by default so this reusable chart doesn't silently hardcode a namespace name
+  # (this phase's DECISIONS.md 2026-08-09 calls for one Zitadel install per customer
+  # namespace). Templates fall back to zitadel.<Release.Namespace>.svc.cluster.local when
+  # unset — override explicitly per-environment (see values.staging.yaml) since Zitadel's
+  # anti-DNS-rebinding Host validation 404s on any mismatch between this value and the
+  # Host header requests actually carry.
+  externalDomain: ""
   externalPort: 8080
   masterkey: ""
   firstInstance:
