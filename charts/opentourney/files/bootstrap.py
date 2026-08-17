@@ -49,11 +49,17 @@ PAT_PATH = "/pat/pat.txt"
 ROLES = ["organizer", "scorekeeper", "player"]
 PROJECT_NAME = "OpenTourney"
 ACTION_NAME = "addRolesClaim"
-APP_NAME = "opentourney-cli"
+CLI_APP_NAME = "opentourney-cli"
 # Nothing listens on this port. The Authorization Code lands in the browser's
 # address bar as a 404 on redirect; it's copied out manually for the curl token
 # exchange (see DEVELOPMENT.md's "Verifying a real Zitadel login" section).
-APP_REDIRECT_URI = "http://localhost:8765/callback"
+CLI_APP_REDIRECT_URI = "http://localhost:8765/callback"
+FRONTEND_APP_NAME = "opentourney-frontend"
+# The frontend's actual origin varies per environment (staging vs. a future
+# prod). Kept as a single staging-hardcoded value for now, matching this
+# chart's existing scope (opentourney-staging only) -- revisit if/when a
+# second environment needs its own app registration.
+FRONTEND_APP_REDIRECT_URI = "http://opentourney-staging.local/callback"
 
 # --- PAT persistence (Kubernetes Secret) -----------------------------------------------
 SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
@@ -199,18 +205,20 @@ def ensure_role(session, project_id, role):
     # Nothing downstream needs the role's own ID, only its roleKey string.
 
 
-def get_or_create_application(session, project_id):
+def get_or_create_application(session, project_id, name, app_type, redirect_uris):
     body = {
-        "name": APP_NAME,
-        "redirectUris": [APP_REDIRECT_URI],
+        "name": name,
+        "redirectUris": redirect_uris,
         "responseTypes": ["OIDC_RESPONSE_TYPE_CODE"],
         "grantTypes": ["OIDC_GRANT_TYPE_AUTHORIZATION_CODE"],
-        # Public client (no secret) using PKCE, appropriate for this phase's manual
-        # curl-based Authorization Code flow. Note: OIDC_APP_TYPE_NATIVE is for
-        # loopback/custom-scheme redirect URIs (RFC 8252), not what Zitadel
-        # recommends for a browser SPA (OIDC_APP_TYPE_USER_AGENT) -- Phase 16's
-        # frontend oidc-client-ts integration will likely need a different app.
-        "appType": "OIDC_APP_TYPE_NATIVE",
+        # Public client (no secret) using PKCE for both app types this function
+        # registers: OIDC_APP_TYPE_NATIVE is for loopback/custom-scheme redirect
+        # URIs (RFC 8252, opentourney-cli's curl-testing use case);
+        # OIDC_APP_TYPE_USER_AGENT is Zitadel's recommended type for a browser
+        # SPA (opentourney-frontend, PR2's oidc-client-ts integration) -- the two
+        # apps exist precisely so each client uses the type Zitadel recommends
+        # for its actual use case instead of sharing one mismatched app.
+        "appType": app_type,
         "authMethodType": "OIDC_AUTH_METHOD_TYPE_NONE",
         "version": "OIDC_VERSION_1_0",
         # Mandatory: Zitadel's default access token is opaque. The backend's
@@ -224,11 +232,11 @@ def get_or_create_application(session, project_id):
     response = session.post(f"{MGMT}/projects/{project_id}/apps/_search", json={})
     response.raise_for_status()
     for app in response.json().get("result", []):
-        if app.get("name") == APP_NAME:
+        if app.get("name") == name:
             app_id = app["id"]
             break
     else:
-        raise RuntimeError(f"application {APP_NAME!r} 409'd on create but not found in search")
+        raise RuntimeError(f"application {name!r} 409'd on create but not found in search")
 
     detail = session.get(f"{MGMT}/projects/{project_id}/apps/{app_id}")
     detail.raise_for_status()
@@ -412,18 +420,25 @@ def main():
     action_id = get_or_create_action(session)
     print(f"action {ACTION_NAME!r} id={action_id}")
 
-    # Ordered after user/grant/action provisioning deliberately: if this call fails
-    # (e.g. Zitadel rejects the redirect URI -- see DEVELOPMENT.md's devMode note),
-    # the more essential provisioning above has already completed and survives a pod
+    # Ordered after user/grant/action provisioning deliberately: if either call fails
+    # (e.g. Zitadel rejects a redirect URI -- see DEVELOPMENT.md's devMode note), the
+    # more essential provisioning above has already completed and survives a pod
     # restart via the idempotent get-or-create pattern, instead of a failure here
     # blocking test users/roles/the roles-claim Action every single retry.
-    client_id = get_or_create_application(session, project_id)
+    cli_client_id = get_or_create_application(
+        session, project_id, CLI_APP_NAME, "OIDC_APP_TYPE_NATIVE", [CLI_APP_REDIRECT_URI]
+    )
     # Logged unconditionally (unlike test-user passwords, which are unrecoverable
     # after creation) since client_id is retrievable via the Management API on any
     # later run -- this line is a convenience for copy/paste into the next
     # `helm upgrade --set-string secrets.oidcAudience=<client_id>`, not the only
     # source of truth.
-    print(f"application {APP_NAME!r} client_id={client_id}")
+    print(f"application {CLI_APP_NAME!r} client_id={cli_client_id}")
+
+    frontend_client_id = get_or_create_application(
+        session, project_id, FRONTEND_APP_NAME, "OIDC_APP_TYPE_USER_AGENT", [FRONTEND_APP_REDIRECT_URI]
+    )
+    print(f"application {FRONTEND_APP_NAME!r} client_id={frontend_client_id}")
 
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)
