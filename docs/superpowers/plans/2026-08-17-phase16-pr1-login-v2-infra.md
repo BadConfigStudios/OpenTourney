@@ -685,8 +685,9 @@ MGMT = f"{ZITADEL_BASE}/management/v1"
 # In-cluster Service DNS name for the Login V2 deployment (see
 # charts/opentourney/templates/zitadel-login-service.yaml). Bare host only --
 # Zitadel's defaultBaseURL() appends /ui/v2/login itself; a pre-suffixed value
-# here produces a double path.
-LOGIN_V2_BASE_URI = os.environ["ZITADEL_LOGIN_V2_BASE_URI"]
+# here produces a double path. Unset (None) when zitadel.login.enabled=false --
+# enable_login_v2_feature() must not run in that case (see main()).
+LOGIN_V2_BASE_URI = os.environ.get("ZITADEL_LOGIN_V2_BASE_URI")
 ```
 
 - [ ] **Step 2: Add `enable_login_v2_feature()`**
@@ -730,8 +731,11 @@ Replace with:
     )
     print(f"application {FRONTEND_APP_NAME!r} client_id={frontend_client_id}")
 
-    enable_login_v2_feature(session)
-    print(f"Login V2 feature enabled, baseUri={LOGIN_V2_BASE_URI}")
+    if LOGIN_V2_BASE_URI:
+        enable_login_v2_feature(session)
+        print(f"Login V2 feature enabled, baseUri={LOGIN_V2_BASE_URI}")
+    else:
+        print("ZITADEL_LOGIN_V2_BASE_URI unset (zitadel.login.enabled=false) -- skipping Login V2 feature enable")
 ```
 
 - [ ] **Step 4: Set `ZITADEL_LOGIN_V2_BASE_URI` on the bootstrap sidecar container**
