@@ -1,0 +1,19 @@
+{{- if and .Values.zitadel.enabled .Values.zitadel.login.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel-login-config
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+data:
+  # Consumed by the login container's own entrypoint, which shell-expands
+  # ${ZITADEL_EXTERNALDOMAIN} (set as a plain container env var below) into
+  # AUDIENCE/CUSTOM_REQUEST_HEADERS at startup -- mirrors zitadel-charts'
+  # configmap_login.yaml exactly (this content isn't something we invented;
+  # it's the shape the official image's entrypoint expects).
+  .env: |-
+    ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
+    AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}"
+    ZITADEL_API_URL="http://{{ include "ot.fullname" . }}-zitadel:8080"
+    CUSTOM_REQUEST_HEADERS="Host:${ZITADEL_EXTERNALDOMAIN},X-Zitadel-Public-Host:${ZITADEL_EXTERNALDOMAIN}"
+{{- end }}
