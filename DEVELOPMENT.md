@@ -133,9 +133,9 @@ alone:
      --set frontend.image.tag=<tag> \
      --set docs.image.tag=<tag> \
      --set-string secrets.databaseUrl=<database-url> \
-     --set-string secrets.oidcIssuer=<oidc-issuer> \
-     --set-string secrets.oidcAudience=<oidc-audience> \
-     --set-string secrets.oidcJwksStatic=<oidc-jwks-static-json> \
+     --set-string secrets.oidcIssuer=<zitadel-issuer> \
+     --set-string secrets.oidcAudience=<client-id-from-bootstrap-log> \
+     --set-string secrets.oidcJwksUrl=<zitadel-issuer>/oauth/v2/keys \
      --set-string zitadel.masterkey=<32-char-masterkey> \
      --set-string zitadel.firstInstance.adminPassword=<admin-password>
    ```
@@ -143,10 +143,24 @@ alone:
    `secrets.databaseUrl`, `secrets.oidcIssuer`, and `secrets.oidcAudience`
    are required (see Prerequisites above) — the chart's `required` guard on
    `secrets.databaseUrl` makes an unset/typo'd value fail the `helm upgrade`
-   itself rather than silently deploying a broken release. Use
-   `--set-string secrets.oidcJwksUrl=<oidc-jwks-url>` instead of
-   `secrets.oidcJwksStatic` if the issuer's JWKS should be fetched live
-   rather than pinned. `zitadel.masterkey` and
+   itself rather than silently deploying a broken release.
+
+   `<zitadel-issuer>` is `.Values.zitadel.externalDomain` prefixed with its
+   scheme and suffixed with its port (e.g.
+   `http://zitadel.opentourney-staging.svc.cluster.local:8080`) — in-cluster
+   only, since no public hostname exists yet (see Namespace & values below).
+   `<client-id-from-bootstrap-log>` comes from the Zitadel bootstrap
+   sidecar's own log line, `application 'opentourney-cli' client_id=...`
+   (`kubectl -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`).
+
+   **Ordering gotcha, same shape as the masterkey caveat below:** on a
+   *fresh* Zitadel stand-up, the client doesn't exist until after Zitadel's
+   pod comes up and its bootstrap sidecar runs — so `secrets.oidcAudience`
+   can't be correct on the very first `helm upgrade` in a new namespace.
+   Deploy once, read the logged `client_id`, then `helm upgrade` again with
+   `secrets.oidcAudience` set correctly. Because `get_or_create_application()`
+   is idempotent, ordinary re-deploys against an already-bootstrapped
+   instance never hit this — only a full teardown/rebuild does. `zitadel.masterkey` and
    `zitadel.firstInstance.adminPassword` are likewise required now that
    `values.staging.yaml` sets `zitadel.enabled: true` — see the Prerequisites
    note above on `zitadel.masterkey` before ever changing this value; reuse
@@ -168,14 +182,85 @@ alone:
    kubectl --context mcgee-local -n opentourney-staging rollout status deployment/opentourney-staging-opentourney-backend
    ```
 
-4. **Verify** via `kubectl port-forward` (no public hostname yet):
+### Verifying a real Zitadel login
+
+Confirms the backend actually accepts a Zitadel-issued token end to end
+(role claim, `source_system` claim, signature/issuer/audience validation) —
+not just that the Helm secret values look right.
+
+1. Port-forward Zitadel:
 
    ```bash
-   kubectl --context mcgee-local -n opentourney-staging port-forward svc/backend 8000:8000
-   curl http://localhost:8000/healthz
+   kubectl --context mcgee-local -n opentourney-staging port-forward svc/zitadel 8080:8080
    ```
 
-5. **Only then** open/merge the PR to `main`.
+2. Zitadel checks the request `Host` header against `ZITADEL_EXTERNALDOMAIN`
+   (anti-DNS-rebinding) and 404s otherwise. Add a temporary `/etc/hosts`
+   entry mapping that hostname to `127.0.0.1` (or pass
+   `curl --resolve <hostname>:8080:127.0.0.1` on every request below).
+
+3. Generate a PKCE pair and open the authorize URL in a browser:
+
+   ```bash
+   python3 -c "
+   import base64, hashlib, secrets
+   verifier = secrets.token_urlsafe(64)
+   challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
+   print('verifier:', verifier)
+   print('challenge:', challenge)
+   "
+   ```
+
+   ```
+   http://<zitadel-issuer-hostname>:8080/oauth/v2/authorize
+     ?client_id=<client-id-from-bootstrap-log>
+     &redirect_uri=http://localhost:8765/callback
+     &response_type=code
+     &scope=openid profile
+     &code_challenge=<challenge>
+     &code_challenge_method=S256
+   ```
+
+   Log in as `organizer@staging.local` with the password the bootstrap
+   sidecar logged at creation time.
+
+4. The browser redirects to `http://localhost:8765/callback?code=...`
+   (404 in the browser — nothing is listening, that's expected). Copy the
+   `code` value out of the address bar.
+
+5. Exchange it for a token:
+
+   ```bash
+   curl -s -X POST http://<zitadel-issuer-hostname>:8080/oauth/v2/token \
+     -H 'Host: <zitadel-issuer-hostname>' \
+     -d grant_type=authorization_code \
+     -d code=<code-from-step-4> \
+     -d redirect_uri=http://localhost:8765/callback \
+     -d client_id=<client-id-from-bootstrap-log> \
+     -d code_verifier=<verifier-from-step-3>
+   ```
+
+   Expected: a JSON body containing `access_token`.
+
+6. Call the backend with it:
+
+   ```bash
+   curl -s -H "Authorization: Bearer <access_token>" \
+     http://<backend-staging-url>/events
+   ```
+
+   Expected: `200`, not `401`. A `401` here most often means
+   `secrets.oidcAudience` doesn't match the token's `aud` (re-check the
+   bootstrap log's `client_id`), or `secrets.oidcIssuer`/`oidcJwksUrl` are
+   pointed at the wrong host.
+
+**Troubleshooting the authorize call:** if Zitadel rejects the redirect URI
+outright (400 on step 3, before any login page renders), the client likely
+needs `"devMode": true` added to Task 1's `get_or_create_application()`
+request body — Zitadel's default posture requires HTTPS redirect URIs for
+non-loopback apps, and this deployment (`ZITADEL_EXTERNALSECURE=false`)
+runs entirely over HTTP. Add the field, re-run the bootstrap Job/pod
+restart, and retry.
 
 ### Known gotchas
 
