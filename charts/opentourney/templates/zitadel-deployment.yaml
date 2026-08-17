@@ -128,12 +128,17 @@ spec:
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 10
+          # start-from-init runs DB migration + FirstInstance bootstrap (org/roles/
+          # users/PAT write) + serving in one process on first boot, which can take
+          # well over 30s against a cold Postgres schema. initialDelay + failureThreshold
+          # * periodSeconds gives ~4 minutes of first-boot slack before a restart.
           livenessProbe:
             httpGet:
               path: /debug/healthz
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 30
+            failureThreshold: 6
         - name: bootstrap
           image: python:3.12-alpine
           # `;` before `sleep infinity`, not `&&`: the container must park after bootstrap.py

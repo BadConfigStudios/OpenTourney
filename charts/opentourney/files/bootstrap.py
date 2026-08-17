@@ -12,7 +12,8 @@ minted by Zitadel's own FirstInstance bootstrap, written to /pat/pat.txt):
     container's stdout -- never written to a file, never committed to git)
   - grants each user their matching role
   - creates a Complement Token Action that flattens the user's grants into a
-    `roles` claim, and attaches it to both Complement Token triggers
+    `roles` claim, sets a fixed `source_system: "zitadel"` claim (required by
+    `identity_from_claims`), and attaches it to both Complement Token triggers
 
 Idempotent: every create call treats a 409 ("already exists") response as a
 no-op success, then resolves the existing resource's ID via a _search call
@@ -67,6 +68,11 @@ function addRolesClaim(ctx, api) {
     });
   });
   api.v1.claims.setClaim("roles", roles);
+  // identity_from_claims (backend/app/auth/identity.py) requires both "sub" and
+  // "source_system" claims -- source_system is part of the composite key every
+  // OrganizationMember/PodRole grant is keyed on. Without this, every request
+  // 401s regardless of the roles claim above.
+  api.v1.claims.setClaim("source_system", "zitadel");
 }
 """
 
