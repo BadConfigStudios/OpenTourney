@@ -424,3 +424,35 @@ revisiting — splitting `Unassigned` into one org per distinct legacy
 organizer identity — if that ever changes (multiple distinct organizer
 identities accumulate events in `Unassigned`) before Phase 13's
 org-management UI exists to reassign events to proper orgs directly.
+
+## 2026-08-16 — Staging gets real login (Zitadel), superseding the 2026-08-09 "staging stays static-JWKS" call
+
+Reverses this part of the 2026-08-09 decision above: "Staging keeps today's
+static-JWKS persona-switcher (FR26) — no broker... consistent with
+minimizing staging's external dependencies." Prompted by the persona-token
+expiry pain in the entry below — pre-minted JWTs have a fixed expiry and no
+refresh path, and re-minting/redeploying by hand doesn't scale.
+
+Rather than just lengthen the token expiry, staging now implements the
+Zitadel broker design from 2026-08-09 early — applied to `opentourney-staging`
+first instead of only prod, later. Everything else about that original
+decision (Zitadel as the broker, one instance per namespace, reusing the
+namespace's existing Postgres via its own schema, deployed as a
+`charts/opentourney` toggle same as `percona.enabled`) still holds; this
+isn't new architecture, it's the same plan on an earlier timeline. Full
+design: `docs/superpowers/specs/2026-08-16-staging-zitadel-login-design.md`.
+
+Three new phases (FR34-36, Build Order 14-16) push Pokémon `GameModule`
+(FR27) and everything after it down by three phases. `oidc-client-ts` is a
+new frontend dependency — not staging-only despite the trigger, since Zitadel
+and prod's eventual Google/Apple/Facebook federation both speak standard
+OIDC Authorization Code + PKCE; the same client plumbing is very likely
+reused for FR30 rather than thrown away.
+
+Alternatives considered for the new dependency: `react-oidc-context` (a
+thinner React-hooks wrapper around the same `oidc-client-ts` engine —
+rejected, more opinionated API than needed, and auth logic isn't
+guaranteed to stay React-component-local); hand-rolled fetch-based
+Authorization Code + PKCE (rejected, zero new dependency but reinvents a
+solved problem and drops silent-renew support for free). `oidc-client-ts`
+confirmed with the owner 2026-08-17.
