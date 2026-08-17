@@ -1,0 +1,17 @@
+{{- if and .Values.zitadel.enabled .Values.zitadel.login.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel-system-api-users
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+data:
+  system-api-users.yaml: |
+    SystemAPIUsers:
+      login-client:
+        Path: /login-client-cert/tls.crt
+        Memberships:
+          - MemberType: System
+            Roles:
+              - IAM_LOGIN_CLIENT
+{{- end }}

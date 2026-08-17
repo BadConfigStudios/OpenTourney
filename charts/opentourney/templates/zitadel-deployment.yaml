@@ -26,6 +26,11 @@ spec:
         # PAT is persisted to a Secret (see the "bootstrap" container below) rather than only
         # living in the emptyDir — a pod replacement no longer loses the one-shot credential.
         checksum/bootstrap-configmap: {{ include (print $.Template.BasePath "/zitadel-bootstrap-configmap.yaml") . | sha256sum }}
+        {{- if .Values.zitadel.login.enabled }}
+        # Same reasoning, for the SystemAPIUsers config -- core only re-reads --config
+        # files on process start, so a content change needs a pod restart to take effect.
+        checksum/system-api-users-configmap: {{ include (print $.Template.BasePath "/zitadel-system-api-users-configmap.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "ot.fullname" . }}-zitadel
       # Disabled: the Service is intentionally named "zitadel" (see zitadel-service.yaml), which
@@ -44,14 +49,39 @@ spec:
         - name: bootstrap-script
           configMap:
             name: {{ include "ot.fullname" . }}-zitadel-bootstrap
+        {{- if .Values.zitadel.login.enabled }}
+        - name: login-client-cert
+          secret:
+            secretName: {{ printf "%s-zitadel-login-service-key" (include "ot.fullname" .) }}
+            items:
+              - key: tls.crt
+                path: tls.crt
+        - name: system-api-users-config
+          configMap:
+            name: {{ include "ot.fullname" . }}-zitadel-system-api-users
+        {{- end }}
       containers:
         - name: zitadel
           image: "{{ .Values.zitadel.image.repository }}:{{ .Values.zitadel.image.tag }}"
           imagePullPolicy: {{ .Values.zitadel.image.pullPolicy }}
-          args: ["start-from-init", "--masterkeyFromEnv"]
+          args:
+            - start-from-init
+            - --masterkeyFromEnv
+            {{- if .Values.zitadel.login.enabled }}
+            - --config
+            - /config/system-api-users.yaml
+            {{- end }}
           volumeMounts:
             - name: pat
               mountPath: /pat
+            {{- if .Values.zitadel.login.enabled }}
+            - name: login-client-cert
+              mountPath: /login-client-cert
+              readOnly: true
+            - name: system-api-users-config
+              mountPath: /config
+              readOnly: true
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ include "ot.fullname" . }}-zitadel-secrets
