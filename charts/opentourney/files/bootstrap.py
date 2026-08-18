@@ -85,11 +85,16 @@ function addRolesClaim(ctx, api) {
   // custom_roles.js example guards this same way. Without the guard, a user
   // with any grants missing from this particular token request crashes the
   // whole Complement Token flow with a 500 (OIDC-AhX2u), not just an empty roles claim.
+  // grant.roles can be undefined too -- same protojson omit-empty behavior,
+  // for a grant with zero assigned roles (a valid grant a console admin can
+  // create) -- guarded the same way to avoid the identical crash one level deeper.
   if (ctx.v1.user.grants && ctx.v1.user.grants.grants) {
     ctx.v1.user.grants.grants.forEach(function (grant) {
-      grant.roles.forEach(function (role) {
-        roles.push(role);
-      });
+      if (grant.roles) {
+        grant.roles.forEach(function (role) {
+          roles.push(role);
+        });
+      }
     });
   }
   api.v1.claims.setClaim("roles", roles);

@@ -20,7 +20,17 @@ RELEASE=opentourney-staging
 CHART="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/charts/opentourney"
 
 secret() {
-  kubectl --context "$CONTEXT" -n "$NAMESPACE" get secret "$1" -o "jsonpath={.data.$2}" | base64 -d
+  local value
+  value=$(kubectl --context "$CONTEXT" -n "$NAMESPACE" get secret "$1" -o "jsonpath={.data.$2}" | base64 -d)
+  # A missing Secret/key or a typo'd key name makes kubectl's jsonpath print
+  # nothing (exit 0) -- without this check that silently resolves to an empty
+  # string, which then blanks a live secret via --set-string on an otherwise
+  # routine upgrade instead of failing loudly.
+  if [[ -z "$value" ]]; then
+    echo "ERROR: secret $1 key $2 is empty or missing -- refusing to proceed with a blank value" >&2
+    exit 1
+  fi
+  echo "$value"
 }
 
 DATABASE_URL=$(secret opentourney-staging-opentourney-secrets DATABASE_URL)

@@ -207,17 +207,14 @@ spec:
             # this must match exactly since both are validated by the same core check
             # (confirmed live during Task 8 of the parent plan: a missing port on a
             # non-default port caused every call to 401 with "audience is not valid").
-            {{- $extPort := int .Values.zitadel.externalPort }}
-            {{- $extSecure := eq (toString .Values.zitadel.externalSecure) "true" }}
-            {{- $isDefaultPort := or (and $extSecure (eq $extPort 443)) (and (not $extSecure) (eq $extPort 80)) }}
             {{- $extDomain := .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) }}
-            # ternary() requires a strict bool; --set-string zitadel.externalSecure=true
-            # (this chart's deploy convention, see scripts/staging-upgrade.sh) makes it a
-            # string, which ternary rejects ("wrong type for value; expected bool; got
-            # string" -- hit live). if/if-not are lenient like zitadel-login-configmap.yaml's
-            # identical AUDIENCE logic, which is why that file never hit this.
+            # ot.zitadelOrigin (see _helpers.tpl) normalizes externalSecure to a real
+            # bool before using it as a condition -- ternary() requires a strict bool;
+            # --set-string zitadel.externalSecure=true (this chart's deploy convention,
+            # see scripts/staging-upgrade.sh) makes it a string, which ternary rejects
+            # ("wrong type for value; expected bool; got string" -- hit live).
             - name: ZITADEL_SYSTEM_API_AUDIENCE
-              value: "http{{ if $extSecure }}s{{ end }}://{{ $extDomain }}{{ if not $isDefaultPort }}:{{ $extPort }}{{ end }}"
+              value: {{ include "ot.zitadelOrigin" (dict "secure" .Values.zitadel.externalSecure "port" .Values.zitadel.externalPort "domain" $extDomain) | quote }}
             {{- if .Values.zitadel.login.enabled }}
             - name: ZITADEL_LOGIN_V2_BASE_URI
               # publicBaseUri is an explicit opt-in override for environments that expose
