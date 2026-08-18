@@ -1,0 +1,13 @@
+{{- if and .Values.zitadel.enabled .Values.zitadel.ingress.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel-internal-host
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+spec:
+  headers:
+    customRequestHeaders:
+      Host: {{ .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) | quote }}
+      X-Forwarded-Host: {{ .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) | quote }}
+{{- end }}
