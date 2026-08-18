@@ -11,14 +11,18 @@ data:
   # AUDIENCE/CUSTOM_REQUEST_HEADERS at startup -- mirrors zitadel-charts'
   # configmap_login.yaml exactly (this content isn't something we invented;
   # it's the shape the official image's entrypoint expects).
+  {{- $extPort := int .Values.zitadel.externalPort }}
+  {{- $extSecure := .Values.zitadel.externalSecure }}
+  {{- $isDefaultPort := or (and $extSecure (eq $extPort 443)) (and (not $extSecure) (eq $extPort 80)) }}
   .env: |-
     ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
     # Core Zitadel's system-JWT audience check requires an exact string match
-    # against its own external URL, port included -- omitting the port here
-    # (8080 is not HTTP's default port 80) caused every readiness/API call
-    # from this container to 401 with "audience is not valid" (confirmed live
-    # via kubectl logs on the core zitadel container during Task 8 verification).
-    AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}:{{ .Values.zitadel.externalPort }}"
+    # against its own external URL -- confirmed live via kubectl logs on the
+    # core zitadel container during Task 8 verification (a missing port on a
+    # non-default port caused every call to 401 with "audience is not valid").
+    # Port is only appended when it isn't the scheme's default, matching
+    # zitadel-charts' own configmap_login.yaml logic exactly.
+    AUDIENCE="http{{ if $extSecure }}s{{ end }}://${ZITADEL_EXTERNALDOMAIN}{{ if not $isDefaultPort }}:{{ $extPort }}{{ end }}"
     ZITADEL_API_URL="http://zitadel:8080"
     CUSTOM_REQUEST_HEADERS="Host:${ZITADEL_EXTERNALDOMAIN},X-Zitadel-Public-Host:${ZITADEL_EXTERNALDOMAIN}"
 {{- end }}

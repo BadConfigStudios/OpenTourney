@@ -91,7 +91,7 @@ spec:
             - name: ZITADEL_EXTERNALPORT
               value: {{ .Values.zitadel.externalPort | quote }}
             - name: ZITADEL_EXTERNALSECURE
-              value: "false"
+              value: {{ .Values.zitadel.externalSecure | quote }}
             - name: ZITADEL_TLS_ENABLED
               value: "false"
             - name: ZITADEL_DATABASE_POSTGRES_HOST

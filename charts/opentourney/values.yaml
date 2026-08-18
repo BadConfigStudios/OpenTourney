@@ -64,22 +64,13 @@ zitadel:
     # (e.g. a Cloudflare tunnel route pointed at it) -- unset means core
     # redirects browsers to the in-cluster-only Service address, which only
     # works for curl/port-forward-based verification, not a real browser.
+    # Same origin as the frontend and core Zitadel (see the top-level
+    # `ingress` block below) -- no in-cluster/public identity split, so
+    # Login V2's own server-generated redirects (which bake in
+    # ZITADEL_EXTERNALDOMAIN directly, not just the inbound request Host)
+    # resolve correctly for a real browser instead of pointing at an
+    # unreachable internal hostname.
     publicBaseUri: ""
-  # Optional real Ingress exposure for core Zitadel + Login V2 (Traefik).
-  # Deliberately separate from publicBaseUri above: this actually terminates
-  # external HTTP traffic in-cluster (vs. publicBaseUri, which just tells
-  # core where to redirect browsers -- something else, like a Cloudflare
-  # tunnel route, has to actually get the traffic there). Core's Ingress
-  # rule gets a Traefik Middleware forcing Host/X-Forwarded-Host back to
-  # externalDomain -- keeps externalDomain as the one source of truth for
-  # every issuer/audience check, instead of migrating it to a public
-  # hostname (a much bigger, cross-cutting change touching every already-
-  # issued token and every OIDC_ISSUER/OIDC_JWKS_URL consumer).
-  ingress:
-    enabled: false
-    className: traefik
-    hostname: ""
-    loginHostname: ""
   # Empty by default so this reusable chart doesn't silently hardcode a namespace name
   # (this phase's DECISIONS.md 2026-08-09 calls for one Zitadel install per customer
   # namespace). Templates fall back to zitadel.<Release.Namespace>.svc.cluster.local when
@@ -88,8 +79,26 @@ zitadel:
   # Host header requests actually carry.
   externalDomain: ""
   externalPort: 8080
+  # False by default (matches this chart's original internal-only design).
+  # Set true when externalDomain is a real publicly-reachable hostname served
+  # over TLS at the edge (e.g. behind the Ingress below via Cloudflare) --
+  # affects only how Zitadel constructs its own issuer/discovery/cookie URLs,
+  # not the plain-HTTP transport it actually uses inside the cluster
+  # (ZITADEL_TLS_ENABLED stays "false" unconditionally either way).
+  externalSecure: false
   masterkey: ""
   firstInstance:
     orgName: "OpenTourney"
     adminUsername: "admin"
     adminPassword: ""
+
+# Single-hostname gateway Ingress (Traefik): path-based routing so the
+# frontend, core Zitadel, and Login V2 all share one public origin --
+# zitadel.externalDomain should equal this same hostname when this is
+# enabled (see zitadel.externalDomain above), which is what lets Zitadel's
+# own domain-matching and Login V2's server-generated redirects work
+# correctly for a real external browser with no header-rewriting tricks.
+ingress:
+  enabled: false
+  className: traefik
+  hostname: ""
