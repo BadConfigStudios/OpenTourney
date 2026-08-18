@@ -12,11 +12,16 @@
 # script's own flags (helm applies later --set/--set-string flags last), e.g.:
 #   scripts/staging-upgrade.sh --set-string secrets.oidcAudience=<new-client-id>
 #   scripts/staging-upgrade.sh --set backend.image.tag=<tag> --set frontend.image.tag=<tag>
+#
+# CONTEXT/NAMESPACE/RELEASE are overridable via env vars (e.g. when
+# mcgee-local times out off-network, run `CONTEXT=mcgee-remote
+# scripts/staging-upgrade.sh`) -- each defaults to the values this script has
+# always used, so a bare invocation is unchanged.
 set -euo pipefail
 
-CONTEXT=mcgee-local
-NAMESPACE=opentourney-staging
-RELEASE=opentourney-staging
+CONTEXT="${CONTEXT:-mcgee-local}"
+NAMESPACE="${NAMESPACE:-opentourney-staging}"
+RELEASE="${RELEASE:-opentourney-staging}"
 CHART="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/charts/opentourney"
 
 secret() {
