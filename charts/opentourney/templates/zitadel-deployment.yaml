@@ -210,8 +210,14 @@ spec:
             {{- $extPort := int .Values.zitadel.externalPort }}
             {{- $extSecure := .Values.zitadel.externalSecure }}
             {{- $isDefaultPort := or (and $extSecure (eq $extPort 443)) (and (not $extSecure) (eq $extPort 80)) }}
+            {{- $extDomain := .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) }}
+            # ternary() requires a strict bool; --set-string zitadel.externalSecure=true
+            # (this chart's deploy convention, see scripts/staging-upgrade.sh) makes it a
+            # string, which ternary rejects ("wrong type for value; expected bool; got
+            # string" -- hit live). if/if-not are lenient like zitadel-login-configmap.yaml's
+            # identical AUDIENCE logic, which is why that file never hit this.
             - name: ZITADEL_SYSTEM_API_AUDIENCE
-              value: {{ printf "http%s://%s%s" (ternary "s" "" $extSecure) (.Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace)) (ternary "" (printf ":%d" $extPort) $isDefaultPort) | quote }}
+              value: "http{{ if $extSecure }}s{{ end }}://{{ $extDomain }}{{ if not $isDefaultPort }}:{{ $extPort }}{{ end }}"
             {{- if .Values.zitadel.login.enabled }}
             - name: ZITADEL_LOGIN_V2_BASE_URI
               # publicBaseUri is an explicit opt-in override for environments that expose
