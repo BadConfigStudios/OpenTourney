@@ -298,13 +298,16 @@ non-loopback apps, and this deployment (`ZITADEL_EXTERNALSECURE=false`)
 runs entirely over HTTP. Add the field, re-run the bootstrap Job/pod
 restart, and retry.
 
-**Troubleshooting a double `/ui/v2/login/ui/v2/login` redirect:** the
-bootstrap sidecar's `enable_login_v2_feature()` sets `loginV2.baseUri` to
-the bare login-service host (`http://<release>-zitadel-login:3000`) —
-Zitadel's `defaultBaseURL()` appends `/ui/v2/login` itself. If the browser
-lands on a doubled path, check
+**Troubleshooting a login redirect 404:** `loginV2.baseUri` (set by the
+bootstrap sidecar's `enable_login_v2_feature()`) MUST include the
+`/ui/v2/login` suffix, both for the in-cluster default
+(`http://<release>-zitadel-login:3000/ui/v2/login`) and any
+`zitadel.login.publicBaseUri` override -- a bare host without the suffix
+produces a 404 on login (issue #88 #1; a prior version of this note
+incorrectly claimed the suffix was appended automatically and should be
+omitted here). If login 404s, check
 `kubectl -n opentourney-staging exec deploy/opentourney-staging-opentourney-zitadel -c bootstrap -- env | grep ZITADEL_LOGIN_V2_BASE_URI`
-for a stray `/ui/v2/login` suffix and re-run the bootstrap sidecar.
+for a missing `/ui/v2/login` suffix and re-run the bootstrap sidecar.
 
 ### Known gotchas
 

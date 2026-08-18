@@ -42,10 +42,15 @@ import requests
 ZITADEL_BASE = "http://localhost:8080"
 MGMT = f"{ZITADEL_BASE}/management/v1"
 # In-cluster Service DNS name for the Login V2 deployment (see
-# charts/opentourney/templates/zitadel-login-service.yaml). Bare host only --
-# Zitadel's defaultBaseURL() appends /ui/v2/login itself; a pre-suffixed value
-# here produces a double path. Unset (None) when zitadel.login.enabled=false --
-# enable_login_v2_feature() must not run in that case (see main()).
+# charts/opentourney/templates/zitadel-login-service.yaml), MUST include the
+# /ui/v2/login suffix -- the only value ever confirmed working live
+# (values.staging.yaml's publicBaseUri override) is fully suffixed; an
+# earlier claim that Zitadel's defaultBaseURL() appends the suffix itself
+# was never live-verified and produced a 404 (issue #88 #1). Set by the
+# chart (zitadel-deployment.yaml) to always include the suffix, whether
+# using the default in-cluster fallback or an operator override. Unset
+# (None) when zitadel.login.enabled=false -- enable_login_v2_feature() must
+# not run in that case (see main()).
 LOGIN_V2_BASE_URI = os.environ.get("ZITADEL_LOGIN_V2_BASE_URI")
 # Zitadel validates the Host header against ZITADEL_EXTERNALDOMAIN (anti-DNS-rebinding
 # protection) and returns 404 for any request presenting a different Host — including

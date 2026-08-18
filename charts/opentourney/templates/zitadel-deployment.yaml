@@ -221,7 +221,9 @@ spec:
               # Login V2 externally (e.g. a Cloudflare tunnel route) -- browser redirects
               # from core need a URI the browser can actually reach, unlike the in-cluster
               # default below. Empty by default: most deploys never need this.
-              value: {{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000" (include "ot.fullname" .)) | quote }}
+              # Both branches include the /ui/v2/login suffix -- the only shape ever
+              # confirmed working live (issue #88 #1); a bare host 404s.
+              value: {{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000/ui/v2/login" (include "ot.fullname" .)) | quote }}
             {{- end }}
           volumeMounts:
             - name: pat

@@ -70,6 +70,12 @@ zitadel:
     # ZITADEL_EXTERNALDOMAIN directly, not just the inbound request Host)
     # resolve correctly for a real browser instead of pointing at an
     # unreachable internal hostname.
+    # MUST include the `/ui/v2/login` suffix (e.g.
+    # "https://host/ui/v2/login") -- an earlier version of this comment
+    # claimed Zitadel's defaultBaseURL() appends the suffix itself and a bare
+    # host was correct. That was never live-verified; the only configuration
+    # ever confirmed working end-to-end (values.staging.yaml) uses the
+    # suffixed form, and a bare host produces a 404 on login (issue #88 #1).
     publicBaseUri: ""
   # Empty by default so this reusable chart doesn't silently hardcode a namespace name
   # (this phase's DECISIONS.md 2026-08-09 calls for one Zitadel install per customer
