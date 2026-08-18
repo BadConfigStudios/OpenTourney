@@ -36,6 +36,7 @@ import string
 import sys
 import time
 
+import jwt
 import requests
 
 ZITADEL_BASE = "http://localhost:8080"
@@ -277,10 +278,58 @@ def get_instance_id(session):
     return response.json()["instance"]["id"]
 
 
-def add_trusted_domain(session, instance_id, domain):
-    # Trusted-domain registration lives under the v2beta Instance service, a
-    # third base path in this file (alongside MGMT and the /v2 Feature API
-    # above) -- not under /admin/v1, which has no such endpoint.
+SYSTEM_API_USER = "opentourney-bootstrap"
+SYSTEM_API_KEY_PATH = "/bootstrap-system-key/tls.key"
+SYSTEM_API_AUDIENCE = os.environ["ZITADEL_SYSTEM_API_AUDIENCE"]
+
+
+def get_system_api_token():
+    # System API auth is separate from the PAT used everywhere else in this
+    # file: a JWT-bearer assertion (RFC 7523), signed with the private half
+    # of the keypair core trusts via SystemAPIUsers (see
+    # charts/opentourney/templates/zitadel-system-api-users-configmap.yaml).
+    # Needed because AddCustomDomain (below) requires the `system.domain.write`
+    # permission, which only the built-in SYSTEM_OWNER role grants -- the PAT's
+    # IAM_OWNER-equivalent role (used for every other call in this file)
+    # doesn't have it. Confirmed live: the PAT gets 403 AUTH-5mWD2 on this
+    # specific endpoint.
+    with open(SYSTEM_API_KEY_PATH) as f:
+        private_key = f.read()
+    now = int(time.time())
+    assertion = jwt.encode(
+        {
+            "iss": SYSTEM_API_USER,
+            "sub": SYSTEM_API_USER,
+            "aud": SYSTEM_API_AUDIENCE,
+            "iat": now,
+            "exp": now + 300,
+        },
+        private_key,
+        algorithm="RS256",
+    )
+    # Not the shared `session` -- this exchange carries no PAT Authorization
+    # header and needs form encoding, not JSON. Still needs the same Host
+    # header spoof every other call in this file uses (anti-DNS-rebinding).
+    response = requests.post(
+        f"{ZITADEL_BASE}/oauth/v2/token",
+        headers={"Host": ZITADEL_EXTERNAL_DOMAIN},
+        data={
+            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            "assertion": assertion,
+            "scope": "openid",
+        },
+    )
+    if not response.ok:
+        print(f"POST /oauth/v2/token (system API) -> {response.status_code}: {response.text}", file=sys.stderr)
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
+def add_custom_domain(instance_id, domain, system_api_token):
+    # The real endpoint for registering a Host-matchable instance domain --
+    # AddTrustedDomain (this file's previous approach) is an unrelated
+    # mechanism; its gRPC handler calls a different command than the one
+    # Zitadel's Host-check (query.InstanceByHost) actually reads from.
     #
     # Needed because a real Zitadel instance can only have one canonical
     # externalDomain, which has to be the public hostname (so core's own
@@ -290,23 +339,30 @@ def add_trusted_domain(session, instance_id, domain):
     # notably) still need to reach Zitadel via the internal Service name
     # without round-tripping through the public internet (which hits
     # Cloudflare's bot/TLS-fingerprint block, error 1010, against a plain
-    # HTTP client). AddTrustedDomain lets both hostnames pass the same
-    # Host-header check without weakening it.
+    # HTTP client).
     #
     # Domain matching strips the port before comparing (Zitadel's
     # DomainCtx.InstanceDomain()), so the registered value must be the bare
     # hostname -- "zitadel", not "zitadel:8080".
-    response = session.post(
-        f"{ZITADEL_BASE}/v2beta/instances/{instance_id}/trusted-domains",
+    response = requests.post(
+        f"{ZITADEL_BASE}/v2beta/instances/{instance_id}/custom-domains",
+        headers={
+            "Host": ZITADEL_EXTERNAL_DOMAIN,
+            "Authorization": f"Bearer {system_api_token}",
+        },
         json={"domain": domain},
     )
-    # Zitadel returns this as 400 (FAILED_PRECONDITION), not 409 -- same
-    # underlying domain-uniqueness check as the primary/generated domain.
-    if response.status_code == 400 and "Errors.Instance.Domain.AlreadyExists" in response.text:
-        return  # already trusted -- idempotent no-op
+    # Matched on message text, not status code: AddCustomDomain's command
+    # (internal/command/instance_domain.go) throws AlreadyExists (gRPC code 6,
+    # conventionally -> HTTP 409) for this case, a different error type than
+    # AddTrustedDomain's FailedPrecondition (code 9 -> 400) seen live for the
+    # unrelated old endpoint -- not yet live-confirmed for this endpoint, so
+    # don't gate on a guessed status code twice in one file.
+    if not response.ok and "Errors.Instance.Domain.AlreadyExists" in response.text:
+        return  # already registered -- idempotent no-op
     if not response.ok:
         print(
-            f"POST /v2beta/instances/{instance_id}/trusted-domains -> {response.status_code}: {response.text}",
+            f"POST /v2beta/instances/{instance_id}/custom-domains -> {response.status_code}: {response.text}",
             file=sys.stderr,
         )
     response.raise_for_status()
@@ -516,8 +572,9 @@ def main():
         print("ZITADEL_LOGIN_V2_BASE_URI unset (zitadel.login.enabled=false) -- skipping Login V2 feature enable")
 
     instance_id = get_instance_id(session)
-    add_trusted_domain(session, instance_id, "zitadel")
-    print("trusted domain 'zitadel' added (lets in-cluster callers use the internal Service name)")
+    system_api_token = get_system_api_token()
+    add_custom_domain(instance_id, "zitadel", system_api_token)
+    print("instance domain 'zitadel' added (lets in-cluster callers use the internal Service name)")
 
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)
