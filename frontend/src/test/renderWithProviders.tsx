@@ -50,6 +50,15 @@ export function renderWithProviders(
 
   const path = options.path ?? "/";
   const routePath = options.routePath ?? path;
+
+  // createMemoryRouter never touches window.location, but AuthContext's
+  // /callback bypass (needed so Callback can mount and call completeSignIn
+  // while unauthenticated) reads window.location.pathname directly, matching
+  // how the real app's createBrowserRouter keeps it in sync. Push the routed
+  // path onto real history so that check sees the path a test asked for;
+  // src/test/setup.ts resets it to "/" after each test.
+  window.history.pushState({}, "", path);
+
   const router = createMemoryRouter(
     [
       { path: routePath, element },

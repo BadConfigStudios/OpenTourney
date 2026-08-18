@@ -1,7 +1,9 @@
 import { act, render, screen } from "@testing-library/react";
 import type { User } from "oidc-client-ts";
+import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ConfigProvider } from "../config/ConfigProvider";
+import { renderWithProviders } from "../test/renderWithProviders";
 import { AuthProvider, useAuth, type MinimalUserManager } from "./AuthContext";
 
 function Probe() {
@@ -107,5 +109,42 @@ describe("AuthProvider", () => {
     await act(async () => button.click());
 
     expect(signinRedirect).toHaveBeenCalledTimes(1);
+  });
+
+  it("mounts children (not the Login button) on /callback while unauthenticated, using the actual routed path", async () => {
+    // Regression test: createMemoryRouter (used by renderWithProviders) never
+    // touches window.location, so AuthContext's /callback bypass -- which
+    // reads window.location.pathname -- only works in tests if
+    // renderWithProviders keeps real history in sync with the routed path.
+    // Without that sync this test renders the Login button instead of
+    // CallbackProbe, and completeSignInSpy is never called.
+    const completeSignInSpy = vi.fn();
+
+    function CallbackProbe() {
+      const { completeSignIn } = useAuth();
+      useEffect(() => {
+        completeSignInSpy();
+        void completeSignIn();
+      }, [completeSignIn]);
+      return <div>callback-mounted</div>;
+    }
+
+    const manager: MinimalUserManager = {
+      getUser: () => Promise.resolve(null),
+      signinRedirect: vi.fn().mockResolvedValue(undefined),
+      signinRedirectCallback: () =>
+        Promise.resolve({
+          access_token: "test-access-token",
+          expired: false,
+          profile: { roles: ["organizer"] },
+        } as unknown as User),
+      removeUser: () => Promise.resolve(),
+    };
+
+    renderWithProviders(<CallbackProbe />, { path: "/callback", userManagerOverride: manager });
+
+    expect(await screen.findByText("callback-mounted")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /log in/i })).not.toBeInTheDocument();
+    expect(completeSignInSpy).toHaveBeenCalledTimes(1);
   });
 });
