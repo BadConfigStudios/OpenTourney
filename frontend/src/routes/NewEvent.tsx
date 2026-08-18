@@ -7,7 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
 
 export function NewEvent() {
-  const { apiFetch, currentPersona } = useAuth();
+  const { apiFetch, currentUser } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [date, setDate] = useState("");
@@ -19,7 +19,7 @@ export function NewEvent() {
   const organizationsQuery = useQuery({
     queryKey: ["organizations"],
     queryFn: () => listOrganizations(apiFetch),
-    enabled: currentPersona.role === "organizer",
+    enabled: currentUser.role === "organizer",
   });
 
   const createOrgMutation = useMutation({
@@ -53,7 +53,7 @@ export function NewEvent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationsQuery.data]);
 
-  if (currentPersona.role !== "organizer") {
+  if (currentUser.role !== "organizer") {
     return <Navigate to="/" replace />;
   }
 

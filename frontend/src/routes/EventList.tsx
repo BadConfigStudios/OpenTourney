@@ -5,7 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
 
 export function EventList() {
-  const { apiFetch, currentPersona } = useAuth();
+  const { apiFetch, currentUser } = useAuth();
   const {
     data: events,
     error,
@@ -16,7 +16,7 @@ export function EventList() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Events</h2>
-        {currentPersona.role === "organizer" && (
+        {currentUser.role === "organizer" && (
           <Link to="/events/new" className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">
             New Event
           </Link>

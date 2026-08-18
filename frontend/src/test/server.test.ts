@@ -7,11 +7,10 @@ describe("msw test server", () => {
     const response = await fetch("/config.json");
     const body = await response.json();
 
-    expect(body.personas.map((p: { label: string }) => p.label)).toEqual([
-      "Organizer",
-      "Scorekeeper",
-      "Player",
-    ]);
+    expect(body).toEqual({
+      oidcAuthority: "http://zitadel.test",
+      oidcClientId: "test-client-id",
+    });
   });
 
   it("lets a test override a handler for one request", async () => {

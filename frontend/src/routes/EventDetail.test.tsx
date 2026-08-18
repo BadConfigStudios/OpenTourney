@@ -3,16 +3,17 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
+import type { PersonaRole } from "../config/types";
 import { EventDetail } from "./EventDetail";
 
 const EVENT = { id: "event-1", date: "2026-08-01", name: "Friday Standard", description: null, organization_id: "org-1" };
 const POD = { id: "pod-1", event_id: "event-1", format_slug: "swiss", game_slug: "generic", completed_at: null };
 
-function renderDetail(personaLabel?: string) {
+function renderDetail(role?: PersonaRole) {
   renderWithProviders(<EventDetail />, {
     path: "/events/event-1",
     routePath: "/events/:eventId",
-    personaLabel,
+    role,
   });
 }
 
@@ -76,7 +77,7 @@ describe("EventDetail", () => {
       http.get("/pods", () => HttpResponse.json([])),
     );
 
-    renderDetail("Player");
+    renderDetail("player");
 
     await screen.findByText("This event has no pod yet.");
     expect(screen.queryByRole("button", { name: "Create Pod" })).not.toBeInTheDocument();

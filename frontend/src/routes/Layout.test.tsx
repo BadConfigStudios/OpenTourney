@@ -16,7 +16,7 @@ describe("Layout", () => {
   });
 
   it("hides the Organizations nav link for a non-Organizer persona", async () => {
-    renderWithProviders(<Layout />, { path: "/", personaLabel: "Player" });
+    renderWithProviders(<Layout />, { path: "/", role: "player" });
 
     await screen.findByText("OpenTourney");
     expect(screen.queryByRole("link", { name: "Organizations" })).not.toBeInTheDocument();

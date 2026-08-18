@@ -29,7 +29,7 @@ describe("EventList", () => {
   it("shows New Event only for the Organizer persona", async () => {
     server.use(http.get("/events", () => HttpResponse.json([])));
 
-    renderWithProviders(<EventList />, { personaLabel: "Scorekeeper" });
+    renderWithProviders(<EventList />, { role: "scorekeeper" });
 
     await screen.findByText("No events yet.");
     expect(screen.queryByRole("link", { name: "New Event" })).not.toBeInTheDocument();

@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
+import type { PersonaRole } from "../config/types";
 import { Report } from "./Report";
 
 const ENTRIES = [
@@ -22,11 +23,11 @@ const COMPLETE_REPORT = {
   ],
 };
 
-function renderReport(personaLabel?: string) {
+function renderReport(role?: PersonaRole) {
   renderWithProviders(<Report />, {
     path: "/pods/pod-1/report",
     routePath: "/pods/:podId/report",
-    personaLabel,
+    role,
   });
 }
 
@@ -137,7 +138,7 @@ describe("Report", () => {
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
     );
 
-    renderReport("Player");
+    renderReport("player");
 
     await screen.findByText("Ash");
     expect(screen.queryByRole("button", { name: "Complete Pod" })).not.toBeInTheDocument();
@@ -149,7 +150,7 @@ describe("Report", () => {
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
     );
 
-    renderReport("Scorekeeper");
+    renderReport("scorekeeper");
 
     await screen.findByText("Ash");
     expect(screen.queryByRole("button", { name: "Complete Pod" })).not.toBeInTheDocument();

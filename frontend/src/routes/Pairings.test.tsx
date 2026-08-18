@@ -5,6 +5,7 @@ import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
 import type { RoundRead } from "../api/rounds";
 import type { MatchResult } from "../api/matches";
+import type { PersonaRole } from "../config/types";
 import { Pairings } from "./Pairings";
 
 const ENTRIES = [
@@ -94,20 +95,19 @@ function reportHandler() {
   );
 }
 
-function renderPairings(personaLabel?: string) {
+function renderPairings(role?: PersonaRole) {
   renderWithProviders(<Pairings />, {
     path: "/pods/pod-1/pairings",
     routePath: "/pods/:podId/pairings",
-    personaLabel,
+    role,
   });
 }
 
 describe("Pairings", () => {
-  // renderPairings() with no personaLabel relies on the AuthProvider's default
-  // (persona[0], "Organizer") — but persona selection is persisted to
-  // localStorage, so an earlier test's explicit renderPairings("Scorekeeper"/"Player")
-  // would otherwise leak into later default-persona tests. This is now reset
-  // globally between every test in ../test/setup.ts's afterEach.
+  // renderPairings() with no role relies on renderWithProviders' default
+  // ("organizer") — each call builds a fresh fake UserManager for the given
+  // role, so an earlier test's explicit renderPairings("scorekeeper"/"player")
+  // never leaks into later default-role tests.
 
   it("shows the latest round's pairings by default, with entry names and table numbers", async () => {
     server.use(
@@ -193,7 +193,7 @@ describe("Pairings", () => {
       reportHandler(),
     );
 
-    renderPairings("Scorekeeper");
+    renderPairings("scorekeeper");
 
     expect(await screen.findByRole("button", { name: "Ash wins" })).toBeInTheDocument();
   });
@@ -205,7 +205,7 @@ describe("Pairings", () => {
       reportHandler(),
     );
 
-    renderPairings("Player");
+    renderPairings("player");
 
     await screen.findByText(/Table 1: Ash vs Misty/);
     expect(screen.queryByRole("button", { name: "Ash wins" })).not.toBeInTheDocument();
@@ -280,7 +280,7 @@ describe("Pairings", () => {
       reportHandler(),
     );
 
-    renderPairings("Scorekeeper");
+    renderPairings("scorekeeper");
 
     await screen.findByText(/Table 1: Ash vs Misty/);
     expect(screen.queryByRole("button", { name: "Generate Next Round" })).not.toBeInTheDocument();
