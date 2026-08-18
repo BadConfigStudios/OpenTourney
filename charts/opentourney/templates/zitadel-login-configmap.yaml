@@ -13,7 +13,12 @@ data:
   # it's the shape the official image's entrypoint expects).
   .env: |-
     ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
-    AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}"
+    # Core Zitadel's system-JWT audience check requires an exact string match
+    # against its own external URL, port included -- omitting the port here
+    # (8080 is not HTTP's default port 80) caused every readiness/API call
+    # from this container to 401 with "audience is not valid" (confirmed live
+    # via kubectl logs on the core zitadel container during Task 8 verification).
+    AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}:{{ .Values.zitadel.externalPort }}"
     ZITADEL_API_URL="http://zitadel:8080"
     CUSTOM_REQUEST_HEADERS="Host:${ZITADEL_EXTERNALDOMAIN},X-Zitadel-Public-Host:${ZITADEL_EXTERNALDOMAIN}"
 {{- end }}

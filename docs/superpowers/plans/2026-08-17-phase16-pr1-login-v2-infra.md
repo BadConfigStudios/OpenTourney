@@ -339,7 +339,11 @@ data:
   # it's the shape the official image's entrypoint expects).
   .env: |-
     ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
-    AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}"
+    # Port included -- 8080 isn't HTTP's default port, and core's system-JWT
+    # audience check requires an exact string match against its own external
+    # URL (confirmed live during Task 8 verification: omitting the port here
+    # produced repeated 401 "audience is not valid" failures).
+    AUDIENCE="http://${ZITADEL_EXTERNALDOMAIN}:{{ .Values.zitadel.externalPort }}"
     # NOT ot.fullname-prefixed: charts/opentourney/templates/zitadel-service.yaml
     # names core Zitadel's Service the bare literal "zitadel" (a pre-existing
     # Phase 14 exception to this chart's usual naming, unrelated to Login V2).
