@@ -271,6 +271,36 @@ def enable_login_v2_feature(session):
     response.raise_for_status()
 
 
+def add_trusted_domain(session, domain):
+    # Admin API lives under /admin/v1 -- a third base path in this file,
+    # alongside MGMT (/management/v1) and the Feature API (/v2) above.
+    #
+    # Needed because a real Zitadel instance can only have one canonical
+    # externalDomain, which now has to be the public hostname (so core's own
+    # anti-DNS-rebinding check and Login V2's server-generated redirects work
+    # for a real external browser -- confirmed live during Task 8
+    # verification). But in-cluster callers (this backend's JWKS fetch,
+    # notably) should never depend on round-tripping through the public
+    # internet just to reach a service in the same namespace -- confirmed
+    # live too: Cloudflare's bot/TLS-fingerprint protection (error 1010)
+    # blocks Python's plain HTTP client outright. Registering the in-cluster
+    # Service name as an additional *trusted* domain (not the primary
+    # externalDomain) is Zitadel's own supported way to let both hostnames
+    # pass the same Host-header check.
+    response = session.post(
+        f"{ZITADEL_BASE}/admin/v1/trusted_domains",
+        json={"domain": domain},
+    )
+    if response.status_code == 409:
+        return  # already trusted -- idempotent no-op
+    if not response.ok:
+        print(
+            f"POST /admin/v1/trusted_domains -> {response.status_code}: {response.text}",
+            file=sys.stderr,
+        )
+    response.raise_for_status()
+
+
 def find_user_by_username(session, username):
     response = session.post(
         f"{MGMT}/users/_search",
@@ -473,6 +503,9 @@ def main():
         print(f"Login V2 feature enabled, baseUri={LOGIN_V2_BASE_URI}")
     else:
         print("ZITADEL_LOGIN_V2_BASE_URI unset (zitadel.login.enabled=false) -- skipping Login V2 feature enable")
+
+    add_trusted_domain(session, "zitadel")
+    print("trusted domain 'zitadel' added (lets in-cluster callers use the internal Service name)")
 
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)
