@@ -19,11 +19,17 @@ spec:
         paths:
           {{- if .Values.zitadel.enabled }}
           # Core Zitadel's own endpoints -- OIDC discovery, JWKS, authorize/token,
-          # userinfo/end_session (/oidc), external IdP callbacks (/idps), and the v2
-          # gRPC-gateway API (/v2, e.g. features/instance). Without these, requests
-          # fall through to the frontend's SPA catch-all and get a 200 with the SPA
-          # shell instead of a real 404 from Zitadel (issue #88 #3) -- silently
-          # breaking oidc-client-ts's userinfo/end_session calls (Phase 16 PR2).
+          # userinfo/end_session (/oidc), and external IdP callbacks (/idps). Without
+          # these, requests fall through to the frontend's SPA catch-all and get a 200
+          # with the SPA shell instead of a real 404 from Zitadel (issue #88 #3) --
+          # silently breaking oidc-client-ts's userinfo/end_session calls (Phase 16
+          # PR2). Deliberately NOT routing /v2 (Zitadel's v2 gRPC-gateway management
+          # API -- users, sessions, orgs, instance features): security review on PR #90
+          # found no caller anywhere in this repo (bootstrap sidecar, Login V2, or the
+          # browser) that reaches it through the public Ingress -- every real call
+          # goes over in-cluster service DNS. Publishing an authenticated admin API
+          # surface with no current consumer is needless attack-surface expansion; add
+          # a narrow /v2/<specific-path> route later if a real caller needs one.
           - path: /oauth
             pathType: Prefix
             backend:
@@ -46,13 +52,6 @@ spec:
                 port:
                   number: 8080
           - path: /idps
-            pathType: Prefix
-            backend:
-              service:
-                name: zitadel
-                port:
-                  number: 8080
-          - path: /v2
             pathType: Prefix
             backend:
               service:
