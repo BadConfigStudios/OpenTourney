@@ -8,6 +8,14 @@ metadata:
   name: {{ include "ot.fullname" . }}-zitadel-login
   labels:
     {{- include "ot.labels" . | nindent 4 }}
+  annotations:
+    # Login V2 does its own instance-resolution check against inbound browser
+    # traffic's Host, not just its own outbound calls to core (which
+    # CUSTOM_REQUEST_HEADERS in zitadel-login-configmap.yaml already covers) --
+    # confirmed live: without this, every request 500s with "unable to set
+    # instance using origin <public-login-host> ... ExternalDomain is
+    # <internal-fqdn>". Same middleware, same reasoning as core's Ingress.
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-zitadel-internal-host@kubernetescrd" .Release.Namespace (include "ot.fullname" .) }}
 spec:
   ingressClassName: {{ .Values.zitadel.ingress.className }}
   rules:
