@@ -300,7 +300,9 @@ def add_trusted_domain(session, instance_id, domain):
         f"{ZITADEL_BASE}/v2beta/instances/{instance_id}/trusted-domains",
         json={"domain": domain},
     )
-    if response.status_code == 409:
+    # Zitadel returns this as 400 (FAILED_PRECONDITION), not 409 -- same
+    # underlying domain-uniqueness check as the primary/generated domain.
+    if response.status_code == 400 and "Errors.Instance.Domain.AlreadyExists" in response.text:
         return  # already trusted -- idempotent no-op
     if not response.ok:
         print(
