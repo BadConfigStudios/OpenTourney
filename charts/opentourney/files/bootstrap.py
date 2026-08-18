@@ -79,11 +79,18 @@ PAT_SECRET_KEY = "pat"
 ACTION_SOURCE = """
 function addRolesClaim(ctx, api) {
   let roles = [];
-  ctx.v1.user.grants.grants.forEach(function (grant) {
-    grant.roles.forEach(function (role) {
-      roles.push(role);
+  // ctx.v1.user.grants (and its own nested .grants) can be undefined -- not just
+  // empty -- confirmed live via a real browser login: Zitadel's own official
+  // custom_roles.js example guards this same way. Without the guard, a user
+  // with any grants missing from this particular token request crashes the
+  // whole Complement Token flow with a 500 (OIDC-AhX2u), not just an empty roles claim.
+  if (ctx.v1.user.grants && ctx.v1.user.grants.grants) {
+    ctx.v1.user.grants.grants.forEach(function (grant) {
+      grant.roles.forEach(function (role) {
+        roles.push(role);
+      });
     });
-  });
+  }
   api.v1.claims.setClaim("roles", roles);
   // identity_from_claims (backend/app/auth/identity.py) requires both "sub" and
   // "source_system" claims -- source_system is part of the composite key every
