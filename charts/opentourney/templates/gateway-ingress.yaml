@@ -1,0 +1,52 @@
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.ingress.hostname }}
+{{- fail "ingress.hostname is required when ingress.enabled=true" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ot.fullname" . }}-gateway
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.hostname }}
+      http:
+        paths:
+          {{- if .Values.zitadel.enabled }}
+          # Core Zitadel's own endpoints -- OIDC discovery, JWKS, authorize/token.
+          - path: /oauth
+            pathType: Prefix
+            backend:
+              service:
+                name: zitadel
+                port:
+                  number: 8080
+          - path: /.well-known
+            pathType: Prefix
+            backend:
+              service:
+                name: zitadel
+                port:
+                  number: 8080
+          {{- end }}
+          {{- if and .Values.zitadel.enabled .Values.zitadel.login.enabled }}
+          - path: /ui/v2/login
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ot.fullname" . }}-zitadel-login
+                port:
+                  number: 3000
+          {{- end }}
+          # Everything else -- the frontend SPA, which already proxies its own
+          # /events, /organizations, etc. paths to the backend internally.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+{{- end }}

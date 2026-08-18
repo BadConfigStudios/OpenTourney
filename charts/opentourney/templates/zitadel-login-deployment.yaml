@@ -1,0 +1,82 @@
+{{- if and .Values.zitadel.enabled .Values.zitadel.login.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel-login
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel-login
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: zitadel-login
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: zitadel-login
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/login-configmap: {{ include (print $.Template.BasePath "/zitadel-login-configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Same dependency-ordering problem the "bootstrap" sidecar solves for
+        # itself in zitadel-deployment.yaml, applied here: the login container
+        # errors out (rather than retrying) if core Zitadel isn't answering yet.
+        - name: wait-for-zitadel
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - |
+              until curl -sf http://zitadel:8080/debug/healthz; do
+                echo "waiting for zitadel core..."
+                sleep 5
+              done
+      containers:
+        - name: login
+          image: "{{ .Values.zitadel.login.image.repository }}:{{ .Values.zitadel.login.image.tag }}"
+          imagePullPolicy: {{ .Values.zitadel.login.image.pullPolicy }}
+          env:
+            - name: NEXT_PUBLIC_BASE_PATH
+              value: /ui/v2/login
+            - name: ZITADEL_EXTERNALDOMAIN
+              value: {{ .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) | quote }}
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: login-config-dotenv
+              mountPath: /.env-file/
+              readOnly: true
+            - name: login-service-key
+              mountPath: /login-service-key
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /ui/v2/login/ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ui/v2/login/healthy
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 6
+      volumes:
+        - name: login-config-dotenv
+          configMap:
+            name: {{ include "ot.fullname" . }}-zitadel-login-config
+        - name: login-service-key
+          secret:
+            secretName: {{ printf "%s-zitadel-login-service-key" (include "ot.fullname" .) }}
+            items:
+              - key: tls.key
+                path: tls.key
+{{- end }}

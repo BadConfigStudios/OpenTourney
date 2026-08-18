@@ -1,0 +1,26 @@
+{{- if and .Values.zitadel.enabled .Values.zitadel.login.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel-login-config
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+data:
+  # Consumed by the login container's own entrypoint, which shell-expands
+  # ${ZITADEL_EXTERNALDOMAIN} (set as a plain container env var below) into
+  # AUDIENCE/CUSTOM_REQUEST_HEADERS at startup -- mirrors zitadel-charts'
+  # configmap_login.yaml exactly (this content isn't something we invented;
+  # it's the shape the official image's entrypoint expects).
+  .env: |-
+    ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
+    # Core Zitadel's system-JWT audience check requires an exact string match
+    # against its own external URL -- confirmed live via kubectl logs on the
+    # core zitadel container during Task 8 verification (a missing port on a
+    # non-default port caused every call to 401 with "audience is not valid").
+    # ot.zitadelOrigin (see _helpers.tpl) shares this logic with
+    # zitadel-deployment.yaml's ZITADEL_SYSTEM_API_AUDIENCE, which must match
+    # core's own external URL the same way.
+    AUDIENCE="{{ include "ot.zitadelOrigin" (dict "secure" .Values.zitadel.externalSecure "port" .Values.zitadel.externalPort "domain" "${ZITADEL_EXTERNALDOMAIN}") }}"
+    ZITADEL_API_URL="http://zitadel:8080"
+    CUSTOM_REQUEST_HEADERS="Host:${ZITADEL_EXTERNALDOMAIN},X-Zitadel-Public-Host:${ZITADEL_EXTERNALDOMAIN}"
+{{- end }}

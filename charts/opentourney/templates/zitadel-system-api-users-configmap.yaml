@@ -1,0 +1,25 @@
+{{- if .Values.zitadel.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ot.fullname" . }}-zitadel-system-api-users
+  labels:
+    {{- include "ot.labels" . | nindent 4 }}
+data:
+  system-api-users.yaml: |
+    SystemAPIUsers:
+      opentourney-bootstrap:
+        Path: /bootstrap-system-key/tls.crt
+        Memberships:
+          - MemberType: System
+            Roles:
+              - SYSTEM_OWNER
+      {{- if .Values.zitadel.login.enabled }}
+      login-client:
+        Path: /login-client-cert/tls.crt
+        Memberships:
+          - MemberType: System
+            Roles:
+              - IAM_LOGIN_CLIENT
+      {{- end }}
+{{- end }}

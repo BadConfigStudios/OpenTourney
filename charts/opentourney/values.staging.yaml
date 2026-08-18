@@ -28,6 +28,18 @@ percona:
   storageSize: 1Gi
   backupStorageSize: 1Gi
 
+secrets:
+  oidcIssuer: "https://opentourney-staging.badconfig.com"
+  oidcJwksUrl: "http://zitadel:8080/oauth/v2/keys"
+
 zitadel:
   enabled: true
-  externalDomain: "zitadel.opentourney-staging.svc.cluster.local"
+  externalDomain: "opentourney-staging.badconfig.com"
+  externalSecure: true
+  externalPort: 443
+  login:
+    publicBaseUri: "https://opentourney-staging.badconfig.com/ui/v2/login"
+
+ingress:
+  enabled: true
+  hostname: "opentourney-staging.badconfig.com"

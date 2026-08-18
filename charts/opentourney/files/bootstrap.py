@@ -36,10 +36,17 @@ import string
 import sys
 import time
 
+import jwt
 import requests
 
 ZITADEL_BASE = "http://localhost:8080"
 MGMT = f"{ZITADEL_BASE}/management/v1"
+# In-cluster Service DNS name for the Login V2 deployment (see
+# charts/opentourney/templates/zitadel-login-service.yaml). Bare host only --
+# Zitadel's defaultBaseURL() appends /ui/v2/login itself; a pre-suffixed value
+# here produces a double path. Unset (None) when zitadel.login.enabled=false --
+# enable_login_v2_feature() must not run in that case (see main()).
+LOGIN_V2_BASE_URI = os.environ.get("ZITADEL_LOGIN_V2_BASE_URI")
 # Zitadel validates the Host header against ZITADEL_EXTERNALDOMAIN (anti-DNS-rebinding
 # protection) and returns 404 for any request presenting a different Host — including
 # the "localhost:8080" the requests library would otherwise send by default when hitting
@@ -49,11 +56,17 @@ PAT_PATH = "/pat/pat.txt"
 ROLES = ["organizer", "scorekeeper", "player"]
 PROJECT_NAME = "OpenTourney"
 ACTION_NAME = "addRolesClaim"
-APP_NAME = "opentourney-cli"
+CLI_APP_NAME = "opentourney-cli"
 # Nothing listens on this port. The Authorization Code lands in the browser's
 # address bar as a 404 on redirect; it's copied out manually for the curl token
 # exchange (see DEVELOPMENT.md's "Verifying a real Zitadel login" section).
-APP_REDIRECT_URI = "http://localhost:8765/callback"
+CLI_APP_REDIRECT_URI = "http://localhost:8765/callback"
+FRONTEND_APP_NAME = "opentourney-frontend"
+# The frontend's actual origin varies per environment (staging vs. a future
+# prod). Kept as a single staging-hardcoded value for now, matching this
+# chart's existing scope (opentourney-staging only) -- revisit if/when a
+# second environment needs its own app registration.
+FRONTEND_APP_REDIRECT_URI = "http://opentourney-staging.local/callback"
 
 # --- PAT persistence (Kubernetes Secret) -----------------------------------------------
 SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
@@ -67,11 +80,23 @@ PAT_SECRET_KEY = "pat"
 ACTION_SOURCE = """
 function addRolesClaim(ctx, api) {
   let roles = [];
-  ctx.v1.user.grants.grants.forEach(function (grant) {
-    grant.roles.forEach(function (role) {
-      roles.push(role);
+  // ctx.v1.user.grants (and its own nested .grants) can be undefined -- not just
+  // empty -- confirmed live via a real browser login: Zitadel's own official
+  // custom_roles.js example guards this same way. Without the guard, a user
+  // with any grants missing from this particular token request crashes the
+  // whole Complement Token flow with a 500 (OIDC-AhX2u), not just an empty roles claim.
+  // grant.roles can be undefined too -- same protojson omit-empty behavior,
+  // for a grant with zero assigned roles (a valid grant a console admin can
+  // create) -- guarded the same way to avoid the identical crash one level deeper.
+  if (ctx.v1.user.grants && ctx.v1.user.grants.grants) {
+    ctx.v1.user.grants.grants.forEach(function (grant) {
+      if (grant.roles) {
+        grant.roles.forEach(function (role) {
+          roles.push(role);
+        });
+      }
     });
-  });
+  }
   api.v1.claims.setClaim("roles", roles);
   // identity_from_claims (backend/app/auth/identity.py) requires both "sub" and
   // "source_system" claims -- source_system is part of the composite key every
@@ -199,18 +224,20 @@ def ensure_role(session, project_id, role):
     # Nothing downstream needs the role's own ID, only its roleKey string.
 
 
-def get_or_create_application(session, project_id):
+def get_or_create_application(session, project_id, name, app_type, redirect_uris):
     body = {
-        "name": APP_NAME,
-        "redirectUris": [APP_REDIRECT_URI],
+        "name": name,
+        "redirectUris": redirect_uris,
         "responseTypes": ["OIDC_RESPONSE_TYPE_CODE"],
         "grantTypes": ["OIDC_GRANT_TYPE_AUTHORIZATION_CODE"],
-        # Public client (no secret) using PKCE, appropriate for this phase's manual
-        # curl-based Authorization Code flow. Note: OIDC_APP_TYPE_NATIVE is for
-        # loopback/custom-scheme redirect URIs (RFC 8252), not what Zitadel
-        # recommends for a browser SPA (OIDC_APP_TYPE_USER_AGENT) -- Phase 16's
-        # frontend oidc-client-ts integration will likely need a different app.
-        "appType": "OIDC_APP_TYPE_NATIVE",
+        # Public client (no secret) using PKCE for both app types this function
+        # registers: OIDC_APP_TYPE_NATIVE is for loopback/custom-scheme redirect
+        # URIs (RFC 8252, opentourney-cli's curl-testing use case);
+        # OIDC_APP_TYPE_USER_AGENT is Zitadel's recommended type for a browser
+        # SPA (opentourney-frontend, PR2's oidc-client-ts integration) -- the two
+        # apps exist precisely so each client uses the type Zitadel recommends
+        # for its actual use case instead of sharing one mismatched app.
+        "appType": app_type,
         "authMethodType": "OIDC_AUTH_METHOD_TYPE_NONE",
         "version": "OIDC_VERSION_1_0",
         # Mandatory: Zitadel's default access token is opaque. The backend's
@@ -224,15 +251,122 @@ def get_or_create_application(session, project_id):
     response = session.post(f"{MGMT}/projects/{project_id}/apps/_search", json={})
     response.raise_for_status()
     for app in response.json().get("result", []):
-        if app.get("name") == APP_NAME:
+        if app.get("name") == name:
             app_id = app["id"]
             break
     else:
-        raise RuntimeError(f"application {APP_NAME!r} 409'd on create but not found in search")
+        raise RuntimeError(f"application {name!r} 409'd on create but not found in search")
 
     detail = session.get(f"{MGMT}/projects/{project_id}/apps/{app_id}")
     detail.raise_for_status()
     return detail.json()["app"]["oidcConfig"]["clientId"]
+
+
+def enable_login_v2_feature(session):
+    # Instance Feature API lives under /v2, not /management/v1 (MGMT) -- a
+    # different base path than every other call in this script.
+    response = session.put(
+        f"{ZITADEL_BASE}/v2/features/instance",
+        json={"loginV2": {"required": True, "baseUri": LOGIN_V2_BASE_URI}},
+    )
+    if not response.ok:
+        print(
+            f"PUT /v2/features/instance -> {response.status_code}: {response.text}",
+            file=sys.stderr,
+        )
+    response.raise_for_status()
+
+
+def get_instance_id(session):
+    response = session.get(f"{ZITADEL_BASE}/admin/v1/instances/me")
+    response.raise_for_status()
+    return response.json()["instance"]["id"]
+
+
+SYSTEM_API_USER = "opentourney-bootstrap"
+SYSTEM_API_KEY_PATH = "/bootstrap-system-key/tls.key"
+SYSTEM_API_AUDIENCE = os.environ["ZITADEL_SYSTEM_API_AUDIENCE"]
+
+
+def get_system_api_token():
+    # System API auth is separate from the PAT used everywhere else in this
+    # file, and separate from a normal OAuth2 JWT-bearer grant too -- no
+    # token exchange happens. Zitadel's request-authorization path
+    # (internal/api/authz/context.go's VerifyTokenAndCreateCtxData) tries the
+    # Bearer value as a real access token first, and on failure falls back to
+    # verifying it directly as a self-signed JWT assertion against the
+    # SystemAPIUsers config (see
+    # charts/opentourney/templates/zitadel-system-api-users-configmap.yaml) --
+    # confirmed by reading that function and internal/api/authz/system_token.go
+    # directly, after POSTing this same assertion to /oauth/v2/token (the
+    # normal OAuth2 JWT-bearer grant flow) failed live with
+    # "invalid_grant: invalid assertion" / "Errors.AuthNKey.NotFound": that
+    # endpoint is Zitadel's unrelated *database-registered machine user* key
+    # flow, not the System API's static-config one. The signed JWT itself
+    # *is* the Bearer token; nothing to exchange it for.
+    #
+    # Needed because AddCustomDomain (below) requires the `system.domain.write`
+    # permission, which only the built-in SYSTEM_OWNER role grants -- the PAT's
+    # IAM_OWNER-equivalent role (used for every other call in this file)
+    # doesn't have it. Confirmed live: the PAT gets 403 AUTH-5mWD2 on this
+    # specific endpoint.
+    with open(SYSTEM_API_KEY_PATH) as f:
+        private_key = f.read()
+    now = int(time.time())
+    return jwt.encode(
+        {
+            "iss": SYSTEM_API_USER,
+            "sub": SYSTEM_API_USER,
+            "aud": SYSTEM_API_AUDIENCE,
+            "iat": now,
+            "exp": now + 300,
+        },
+        private_key,
+        algorithm="RS256",
+    )
+
+
+def add_custom_domain(instance_id, domain, system_api_token):
+    # The real endpoint for registering a Host-matchable instance domain --
+    # AddTrustedDomain (this file's previous approach) is an unrelated
+    # mechanism; its gRPC handler calls a different command than the one
+    # Zitadel's Host-check (query.InstanceByHost) actually reads from.
+    #
+    # Needed because a real Zitadel instance can only have one canonical
+    # externalDomain, which has to be the public hostname (so core's own
+    # anti-DNS-rebinding check and Login V2's server-generated redirects work
+    # for a real external browser -- confirmed live during Task 8
+    # verification). In-cluster callers (this backend's JWKS fetch,
+    # notably) still need to reach Zitadel via the internal Service name
+    # without round-tripping through the public internet (which hits
+    # Cloudflare's bot/TLS-fingerprint block, error 1010, against a plain
+    # HTTP client).
+    #
+    # Domain matching strips the port before comparing (Zitadel's
+    # DomainCtx.InstanceDomain()), so the registered value must be the bare
+    # hostname -- "zitadel", not "zitadel:8080".
+    response = requests.post(
+        f"{ZITADEL_BASE}/v2beta/instances/{instance_id}/custom-domains",
+        headers={
+            "Host": ZITADEL_EXTERNAL_DOMAIN,
+            "Authorization": f"Bearer {system_api_token}",
+        },
+        json={"domain": domain},
+    )
+    # Matched on message text, not status code: AddCustomDomain's command
+    # (internal/command/instance_domain.go) throws AlreadyExists (gRPC code 6,
+    # conventionally -> HTTP 409) for this case, a different error type than
+    # AddTrustedDomain's FailedPrecondition (code 9 -> 400) seen live for the
+    # unrelated old endpoint -- not yet live-confirmed for this endpoint, so
+    # don't gate on a guessed status code twice in one file.
+    if not response.ok and "Errors.Instance.Domain.AlreadyExists" in response.text:
+        return  # already registered -- idempotent no-op
+    if not response.ok:
+        print(
+            f"POST /v2beta/instances/{instance_id}/custom-domains -> {response.status_code}: {response.text}",
+            file=sys.stderr,
+        )
+    response.raise_for_status()
 
 
 def find_user_by_username(session, username):
@@ -412,23 +546,48 @@ def main():
     action_id = get_or_create_action(session)
     print(f"action {ACTION_NAME!r} id={action_id}")
 
-    # Ordered after user/grant/action provisioning deliberately: if this call fails
-    # (e.g. Zitadel rejects the redirect URI -- see DEVELOPMENT.md's devMode note),
-    # the more essential provisioning above has already completed and survives a pod
+    # Ordered after user/grant/action provisioning deliberately: if either call fails
+    # (e.g. Zitadel rejects a redirect URI -- see DEVELOPMENT.md's devMode note), the
+    # more essential provisioning above has already completed and survives a pod
     # restart via the idempotent get-or-create pattern, instead of a failure here
     # blocking test users/roles/the roles-claim Action every single retry.
-    client_id = get_or_create_application(session, project_id)
+    cli_client_id = get_or_create_application(
+        session, project_id, CLI_APP_NAME, "OIDC_APP_TYPE_NATIVE", [CLI_APP_REDIRECT_URI]
+    )
     # Logged unconditionally (unlike test-user passwords, which are unrecoverable
     # after creation) since client_id is retrievable via the Management API on any
     # later run -- this line is a convenience for copy/paste into the next
     # `helm upgrade --set-string secrets.oidcAudience=<client_id>`, not the only
     # source of truth.
-    print(f"application {APP_NAME!r} client_id={client_id}")
+    print(f"application {CLI_APP_NAME!r} client_id={cli_client_id}")
+
+    frontend_client_id = get_or_create_application(
+        session, project_id, FRONTEND_APP_NAME, "OIDC_APP_TYPE_USER_AGENT", [FRONTEND_APP_REDIRECT_URI]
+    )
+    print(f"application {FRONTEND_APP_NAME!r} client_id={frontend_client_id}")
+
+    if LOGIN_V2_BASE_URI:
+        enable_login_v2_feature(session)
+        print(f"Login V2 feature enabled, baseUri={LOGIN_V2_BASE_URI}")
+    else:
+        print("ZITADEL_LOGIN_V2_BASE_URI unset (zitadel.login.enabled=false) -- skipping Login V2 feature enable")
 
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)
     set_trigger(session, 2, 5, action_id)
     print("roles-claim action attached to both Complement Token triggers")
+
+    # Ordered last deliberately: add_custom_domain's idempotent already-exists check
+    # matches on response message text that's only been confirmed live on a first
+    # run, not yet a second one (see add_custom_domain's own comment). If that text
+    # match is ever wrong, raise_for_status() fires here -- but by this point every
+    # more essential call above has already completed and survives a pod restart via
+    # the idempotent get-or-create pattern, instead of a failure here blocking
+    # test users/roles/the roles-claim Action every single retry.
+    instance_id = get_instance_id(session)
+    system_api_token = get_system_api_token()
+    add_custom_domain(instance_id, "zitadel", system_api_token)
+    print("instance domain 'zitadel' added (lets in-cluster callers use the internal Service name)")
 
     print("bootstrap complete")
 
