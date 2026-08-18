@@ -294,9 +294,12 @@ completes.
 outright (400 on step 3, before any login page renders), the client likely
 needs `"devMode": true` added to `get_or_create_application()`'s request
 body — Zitadel's default posture requires HTTPS redirect URIs for
-non-loopback apps, and this deployment (`ZITADEL_EXTERNALSECURE=false`)
-runs entirely over HTTP. Add the field, re-run the bootstrap Job/pod
-restart, and retry.
+non-loopback apps. Staging runs `zitadel.externalSecure: true` and the
+frontend's redirect URI is HTTPS (issue #88 #2), so this shouldn't be
+needed there; this note previously (incorrectly, for staging) assumed an
+HTTP-only deployment. If it does trigger, add the field to `body` in both
+`get_or_create_application()`'s create path and its `update_body` (the
+self-healing PUT), re-run the bootstrap Job/pod restart, and retry.
 
 **Troubleshooting a login redirect 404:** `loginV2.baseUri` (set by the
 bootstrap sidecar's `enable_login_v2_feature()`) MUST include the

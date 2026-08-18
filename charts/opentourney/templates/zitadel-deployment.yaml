@@ -225,6 +225,14 @@ spec:
               # confirmed working live (issue #88 #1); a bare host 404s.
               value: {{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000/ui/v2/login" (include "ot.fullname" .)) | quote }}
             {{- end }}
+            # opentourney-frontend's registered OIDC redirect URI (bootstrap.py). The
+            # frontend and Zitadel deliberately share one public origin (see
+            # gateway-ingress.yaml's single-hostname routing) -- reusing
+            # zitadel.externalSecure/externalPort for scheme/port is safe because the
+            # fail guard in gateway-ingress.yaml (issue #88 minor #8) requires
+            # ingress.hostname to equal zitadel.externalDomain whenever both are set.
+            - name: ZITADEL_FRONTEND_APP_REDIRECT_URI
+              value: {{ printf "%s/callback" (include "ot.zitadelOrigin" (dict "secure" .Values.zitadel.externalSecure "port" .Values.zitadel.externalPort "domain" (required "ingress.hostname is required to register opentourney-frontend's OIDC redirect URI" .Values.ingress.hostname))) | quote }}
           volumeMounts:
             - name: pat
               mountPath: /pat

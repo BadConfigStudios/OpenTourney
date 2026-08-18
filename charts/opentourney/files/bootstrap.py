@@ -67,11 +67,11 @@ CLI_APP_NAME = "opentourney-cli"
 # exchange (see DEVELOPMENT.md's "Verifying a real Zitadel login" section).
 CLI_APP_REDIRECT_URI = "http://localhost:8765/callback"
 FRONTEND_APP_NAME = "opentourney-frontend"
-# The frontend's actual origin varies per environment (staging vs. a future
-# prod). Kept as a single staging-hardcoded value for now, matching this
-# chart's existing scope (opentourney-staging only) -- revisit if/when a
-# second environment needs its own app registration.
-FRONTEND_APP_REDIRECT_URI = "http://opentourney-staging.local/callback"
+# Computed by the chart from ingress.hostname + zitadel.externalSecure/externalPort
+# (see zitadel-deployment.yaml) -- varies per environment, and must exactly match
+# what the real frontend's AuthContext sends as its redirect_uri (Phase 16 PR2's
+# `${window.location.origin}/callback`) or Zitadel rejects the authorize call.
+FRONTEND_APP_REDIRECT_URI = os.environ["ZITADEL_FRONTEND_APP_REDIRECT_URI"]
 
 # --- PAT persistence (Kubernetes Secret) -----------------------------------------------
 SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
@@ -261,6 +261,50 @@ def get_or_create_application(session, project_id, name, app_type, redirect_uris
             break
     else:
         raise RuntimeError(f"application {name!r} 409'd on create but not found in search")
+
+    # Unlike every other get-or-create in this file, an OIDC app's redirect_uris is
+    # exactly the field that changes across bootstrap.py edits (issue #88 #2: this
+    # PR's own FRONTEND_APP_REDIRECT_URI fix) -- a stale already-registered app would
+    # otherwise keep rejecting the real client's callback forever. PUT the current
+    # config back on every run, the same self-healing pattern get_or_create_action()
+    # already uses for its ACTION_SOURCE script.
+    update_body = {
+        "redirectUris": redirect_uris,
+        "responseTypes": body["responseTypes"],
+        "grantTypes": body["grantTypes"],
+        "authMethodType": body["authMethodType"],
+        "accessTokenType": body["accessTokenType"],
+    }
+    put_response = session.put(
+        f"{MGMT}/projects/{project_id}/apps/{app_id}/oidc_config", json=update_body
+    )
+    if put_response.status_code == 400:
+        # Same "No Changes" idempotency quirk documented on set_trigger()/
+        # get_or_create_action() -- PUTting back byte-identical config Zitadel
+        # already has returns 400, not a 200 no-op. UpdateOIDCAppConfig's own
+        # error id for this case isn't yet confirmed live (unlike COMMAND-Nfh52/
+        # ACTION-dg4t2 for the other two) -- matching on code==9 (gRPC
+        # FailedPrecondition, the shared family both known ids belong to) is
+        # deliberately broader here until a real run confirms the specific id;
+        # if this ever masks a genuine error, the printed stderr line below
+        # still surfaces it for a human, since raise_for_status() only fires on
+        # a *different* status code, not on a 400 matched here.
+        try:
+            put_body = put_response.json()
+        except ValueError:
+            put_body = {}
+        if put_body.get("code") != 9:
+            print(
+                f"PUT /projects/{project_id}/apps/{app_id}/oidc_config -> 400: {put_response.text}",
+                file=sys.stderr,
+            )
+            put_response.raise_for_status()
+    elif not put_response.ok:
+        print(
+            f"PUT /projects/{project_id}/apps/{app_id}/oidc_config -> {put_response.status_code}: {put_response.text}",
+            file=sys.stderr,
+        )
+        put_response.raise_for_status()
 
     detail = session.get(f"{MGMT}/projects/{project_id}/apps/{app_id}")
     detail.raise_for_status()
