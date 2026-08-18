@@ -20,6 +20,10 @@ spec:
       annotations:
         checksum/login-configmap: {{ include (print $.Template.BasePath "/zitadel-login-configmap.yaml") . | sha256sum }}
     spec:
+      # Same reasoning as core's Deployment (zitadel-deployment.yaml): this pod
+      # receives the same injected ZITADEL_* env vars and reads ZITADEL_EXTERNALDOMAIN
+      # too, so it's exposed to the same kubelet service-links collision risk.
+      enableServiceLinks: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

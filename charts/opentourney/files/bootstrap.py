@@ -62,6 +62,9 @@ ROLES = ["organizer", "scorekeeper", "player"]
 PROJECT_NAME = "OpenTourney"
 ACTION_NAME = "addRolesClaim"
 CLI_APP_NAME = "opentourney-cli"
+SYSTEM_API_USER = "opentourney-bootstrap"
+SYSTEM_API_KEY_PATH = "/bootstrap-system-key/tls.key"
+SYSTEM_API_AUDIENCE = os.environ["ZITADEL_SYSTEM_API_AUDIENCE"]
 # Nothing listens on this port. The Authorization Code lands in the browser's
 # address bar as a 404 on redirect; it's copied out manually for the curl token
 # exchange (see DEVELOPMENT.md's "Verifying a real Zitadel login" section).
@@ -331,11 +334,6 @@ def get_instance_id(session):
     response = session.get(f"{ZITADEL_BASE}/admin/v1/instances/me")
     response.raise_for_status()
     return response.json()["instance"]["id"]
-
-
-SYSTEM_API_USER = "opentourney-bootstrap"
-SYSTEM_API_KEY_PATH = "/bootstrap-system-key/tls.key"
-SYSTEM_API_AUDIENCE = os.environ["ZITADEL_SYSTEM_API_AUDIENCE"]
 
 
 def get_system_api_token():

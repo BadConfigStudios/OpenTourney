@@ -2,6 +2,9 @@
 {{- if not .Values.ingress.hostname }}
 {{- fail "ingress.hostname is required when ingress.enabled=true" }}
 {{- end }}
+{{- if and .Values.zitadel.enabled .Values.zitadel.externalDomain (ne .Values.ingress.hostname .Values.zitadel.externalDomain) }}
+{{- fail "ingress.hostname must equal zitadel.externalDomain when both are set -- Zitadel's anti-DNS-rebinding Host check 404s on any mismatch (this failure mode has already been debugged twice on this chart)" }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
