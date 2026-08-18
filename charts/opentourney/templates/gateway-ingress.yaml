@@ -15,7 +15,12 @@ spec:
       http:
         paths:
           {{- if .Values.zitadel.enabled }}
-          # Core Zitadel's own endpoints -- OIDC discovery, JWKS, authorize/token.
+          # Core Zitadel's own endpoints -- OIDC discovery, JWKS, authorize/token,
+          # userinfo/end_session (/oidc), external IdP callbacks (/idps), and the v2
+          # gRPC-gateway API (/v2, e.g. features/instance). Without these, requests
+          # fall through to the frontend's SPA catch-all and get a 200 with the SPA
+          # shell instead of a real 404 from Zitadel (issue #88 #3) -- silently
+          # breaking oidc-client-ts's userinfo/end_session calls (Phase 16 PR2).
           - path: /oauth
             pathType: Prefix
             backend:
@@ -24,6 +29,27 @@ spec:
                 port:
                   number: 8080
           - path: /.well-known
+            pathType: Prefix
+            backend:
+              service:
+                name: zitadel
+                port:
+                  number: 8080
+          - path: /oidc
+            pathType: Prefix
+            backend:
+              service:
+                name: zitadel
+                port:
+                  number: 8080
+          - path: /idps
+            pathType: Prefix
+            backend:
+              service:
+                name: zitadel
+                port:
+                  number: 8080
+          - path: /v2
             pathType: Prefix
             backend:
               service:
