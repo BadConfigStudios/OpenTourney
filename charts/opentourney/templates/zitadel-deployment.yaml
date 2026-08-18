@@ -190,7 +190,11 @@ spec:
               value: {{ printf "%s-zitadel-pat" (include "ot.fullname" .) | quote }}
             {{- if .Values.zitadel.login.enabled }}
             - name: ZITADEL_LOGIN_V2_BASE_URI
-              value: {{ printf "http://%s-zitadel-login:3000" (include "ot.fullname" .) | quote }}
+              # publicBaseUri is an explicit opt-in override for environments that expose
+              # Login V2 externally (e.g. a Cloudflare tunnel route) -- browser redirects
+              # from core need a URI the browser can actually reach, unlike the in-cluster
+              # default below. Empty by default: most deploys never need this.
+              value: {{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000" (include "ot.fullname" .)) | quote }}
             {{- end }}
           volumeMounts:
             - name: pat

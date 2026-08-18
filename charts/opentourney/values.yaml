@@ -60,6 +60,11 @@ zitadel:
       # deploy time (Task 8); bump both tags together on future upgrades.
       tag: v4.17.1
       pullPolicy: IfNotPresent
+    # Opt-in override for environments where Login V2 is exposed externally
+    # (e.g. a Cloudflare tunnel route pointed at it) -- unset means core
+    # redirects browsers to the in-cluster-only Service address, which only
+    # works for curl/port-forward-based verification, not a real browser.
+    publicBaseUri: ""
   # Empty by default so this reusable chart doesn't silently hardcode a namespace name
   # (this phase's DECISIONS.md 2026-08-09 calls for one Zitadel install per customer
   # namespace). Templates fall back to zitadel.<Release.Namespace>.svc.cluster.local when

@@ -773,9 +773,15 @@ Replace with:
               value: {{ printf "%s-zitadel-pat" (include "ot.fullname" .) | quote }}
             {{- if .Values.zitadel.login.enabled }}
             - name: ZITADEL_LOGIN_V2_BASE_URI
-              value: {{ printf "http://%s-zitadel-login:3000" (include "ot.fullname" .) | quote }}
+              value: {{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000" (include "ot.fullname" .)) | quote }}
             {{- end }}
 ```
+
+Addendum from Task 8 live verification: added `.Values.zitadel.login.publicBaseUri`
+(default `""`, new `values.yaml` field) as an explicit opt-in override — when a Cloudflare
+tunnel route exposes Login V2 externally for a real browser walkthrough, core's redirect
+must point at that public hostname instead of the in-cluster Service address a browser
+can't reach. Unset in every normal deploy; the in-cluster default is unchanged.
 
 - [ ] **Step 5: Local syntax check**
 
