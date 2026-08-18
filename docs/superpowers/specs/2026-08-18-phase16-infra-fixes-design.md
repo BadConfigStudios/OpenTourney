@@ -19,6 +19,7 @@ None of the 3 blockers touch frontend code; all are backend/infra (Helm chart, `
 **Current state:** Three places (`values.yaml`'s comment on `zitadel.login.publicBaseUri`, `bootstrap.py`'s comment on `LOGIN_V2_BASE_URI`, and `DEVELOPMENT.md`'s "double `/ui/v2/login`" troubleshooting note) assert that Zitadel's `defaultBaseURL()` appends `/ui/v2/login` itself, so the value passed here must be a bare host. But `values.staging.yaml` — the only configuration ever verified end-to-end — sets `publicBaseUri: "https://opentourney-staging.badconfig.com/ui/v2/login"`, **with** the suffix. The bare-host claim was never live-verified and is contradicted by the one config that works.
 
 **Fix:**
+
 - Correct the three comments to state the suffix is required.
 - `DEVELOPMENT.md`'s "double `/ui/v2/login`" troubleshooting note is also stale — it predates PR1's `externalSecure: true` cutover and describes the old bare-host-is-correct assumption. Rewrite it to match reality.
 - Append `/ui/v2/login` to the in-cluster fallback default in `zitadel-deployment.yaml` (the `{{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000" ...) }}` fallback used when `publicBaseUri` is unset), for consistency with the only shape ever confirmed working.
@@ -29,6 +30,7 @@ None of the 3 blockers touch frontend code; all are backend/infra (Helm chart, `
 **Current state:** `bootstrap.py` hardcodes `FRONTEND_APP_REDIRECT_URI = "http://opentourney-staging.local/callback"`, predating PR1's migration to the real public hostname. `get_or_create_application()`'s 409-idempotent path never PUTs redirect URIs on an already-existing app, so fixing the constant alone won't fix the already-registered `opentourney-frontend` app.
 
 **Fix:**
+
 - Derive the real callback URL from chart values instead of hardcoding it: `https://<ingress.hostname>/callback`. The frontend and Zitadel already share one public origin by this chart's single-domain gateway design (see `gateway-ingress.yaml`), so `ingress.hostname` is the correct source. Compute this in the chart (reusing the existing `ot.zitadelOrigin` helper pattern already used for `ZITADEL_SYSTEM_API_AUDIENCE`) and pass it to the bootstrap container as a new env var (e.g. `ZITADEL_FRONTEND_APP_REDIRECT_URI`); `bootstrap.py` reads it instead of the hardcoded constant.
 - Add an update-on-already-exists branch to `get_or_create_application()`, mirroring the existing PUT-on-409 pattern in `get_or_create_action()` (PUT the current fields; treat a "no changes" 400 the same way `set_trigger`/`get_or_create_action` already do). This self-heals the already-registered app on the next `helm upgrade` — no manual one-time Console fix required.
 - **devMode:** the corrected URI is HTTPS, and staging already runs `zitadel.externalSecure: true`. Zitadel's real policy (HTTPS required for non-loopback redirect URIs) is already satisfied, so `devMode: true` is very likely unnecessary — the existing `DEVELOPMENT.md` note claiming it's needed describes an old HTTP-only (`externalSecure: false`) deployment, not staging today. Don't guess: verify live during this PR's own verification step (below) and only add the flag if a real `400` proves it's needed.
@@ -57,6 +59,7 @@ None of the 3 blockers touch frontend code; all are backend/infra (Helm chart, `
 
 Since this PR's whole purpose is unblocking PR2's live walkthrough, verify live here rather than deferring to PR2:
 
+0. Before any `kubectl`/deploy command: check `mcgee-local` reachability first, fall back to `mcgee-remote` if off-network (`mcgee-local` times out) — confirm which context is live before running the steps below, not mid-step.
 1. `helm lint` + `helm template` render clean (existing pattern from PR1's plan).
 2. Deploy to staging (`scripts/staging-upgrade.sh` or documented `helm upgrade`).
 3. Confirm the bootstrap sidecar's log shows the `opentourney-frontend` app's redirect URI updated to the real HTTPS callback URL (via the new update-on-exists path) — check the Management API or a direct `kubectl exec` query against the existing app, not just the log line.
