@@ -208,7 +208,7 @@ spec:
             # (confirmed live during Task 8 of the parent plan: a missing port on a
             # non-default port caused every call to 401 with "audience is not valid").
             {{- $extPort := int .Values.zitadel.externalPort }}
-            {{- $extSecure := .Values.zitadel.externalSecure }}
+            {{- $extSecure := eq (toString .Values.zitadel.externalSecure) "true" }}
             {{- $isDefaultPort := or (and $extSecure (eq $extPort 443)) (and (not $extSecure) (eq $extPort 80)) }}
             {{- $extDomain := .Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace) }}
             # ternary() requires a strict bool; --set-string zitadel.externalSecure=true

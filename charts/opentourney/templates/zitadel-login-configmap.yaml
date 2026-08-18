@@ -12,7 +12,7 @@ data:
   # configmap_login.yaml exactly (this content isn't something we invented;
   # it's the shape the official image's entrypoint expects).
   {{- $extPort := int .Values.zitadel.externalPort }}
-  {{- $extSecure := .Values.zitadel.externalSecure }}
+  {{- $extSecure := eq (toString .Values.zitadel.externalSecure) "true" }}
   {{- $isDefaultPort := or (and $extSecure (eq $extPort 443)) (and (not $extSecure) (eq $extPort 80)) }}
   .env: |-
     ZITADEL_LOGINCLIENT_KEYFILE="/login-service-key/tls.key"
