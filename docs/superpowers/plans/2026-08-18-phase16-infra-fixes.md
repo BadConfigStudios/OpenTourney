@@ -458,9 +458,15 @@ Expected: `RENDER_OK`; grep the output for `ZITADEL_FRONTEND_APP_REDIRECT_URI` a
 ```bash
 helm template opentourney-staging charts/opentourney \
   --set zitadel.enabled=false \
+  --set-string secrets.databaseUrl=postgres://x \
+  --set-string secrets.oidcIssuer=http://x \
+  --set-string secrets.oidcAudience=x \
+  --set-string secrets.oidcJwksStatic='{"keys":[]}' \
   | python3 -c "import sys, yaml; list(yaml.safe_load_all(sys.stdin))" \
   && echo RENDER_OK
 ```
+
+(The `secrets.*` flags are needed regardless of `zitadel.enabled` — `secret.yaml`'s `required` guard on `secrets.databaseUrl` is unconditional, unrelated to Zitadel. `zitadel.masterkey`/`zitadel.firstInstance.adminPassword` are omitted here since the whole `zitadel:` block — including their `required` guards — is skipped when `zitadel.enabled=false`.)
 
 Expected: `RENDER_OK` — with `zitadel.enabled=false`, the whole `zitadel-deployment.yaml` template (including the new `required` guard) is skipped by its outer `{{- if .Values.zitadel.enabled }}`, so this must still render cleanly with no `ingress.hostname` set.
 
