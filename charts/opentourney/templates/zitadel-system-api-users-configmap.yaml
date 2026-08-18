@@ -1,4 +1,4 @@
-{{- if and .Values.zitadel.enabled .Values.zitadel.login.enabled }}
+{{- if .Values.zitadel.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,10 +8,18 @@ metadata:
 data:
   system-api-users.yaml: |
     SystemAPIUsers:
+      opentourney-bootstrap:
+        Path: /bootstrap-system-key/tls.crt
+        Memberships:
+          - MemberType: System
+            Roles:
+              - SYSTEM_OWNER
+      {{- if .Values.zitadel.login.enabled }}
       login-client:
         Path: /login-client-cert/tls.crt
         Memberships:
           - MemberType: System
             Roles:
               - IAM_LOGIN_CLIENT
+      {{- end }}
 {{- end }}

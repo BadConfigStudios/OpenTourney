@@ -26,11 +26,11 @@ spec:
         # PAT is persisted to a Secret (see the "bootstrap" container below) rather than only
         # living in the emptyDir — a pod replacement no longer loses the one-shot credential.
         checksum/bootstrap-configmap: {{ include (print $.Template.BasePath "/zitadel-bootstrap-configmap.yaml") . | sha256sum }}
-        {{- if .Values.zitadel.login.enabled }}
         # Same reasoning, for the SystemAPIUsers config -- core only re-reads --config
         # files on process start, so a content change needs a pod restart to take effect.
+        # Unconditional now: the bootstrap system user (SYSTEM_OWNER) must exist
+        # regardless of zitadel.login.enabled.
         checksum/system-api-users-configmap: {{ include (print $.Template.BasePath "/zitadel-system-api-users-configmap.yaml") . | sha256sum }}
-        {{- end }}
     spec:
       serviceAccountName: {{ include "ot.fullname" . }}-zitadel
       # Disabled: the Service is intentionally named "zitadel" (see zitadel-service.yaml), which
@@ -49,6 +49,15 @@ spec:
         - name: bootstrap-script
           configMap:
             name: {{ include "ot.fullname" . }}-zitadel-bootstrap
+        - name: bootstrap-system-key-cert
+          secret:
+            secretName: {{ printf "%s-zitadel-bootstrap-system-key" (include "ot.fullname" .) }}
+            items:
+              - key: tls.crt
+                path: tls.crt
+        - name: system-api-users-config
+          configMap:
+            name: {{ include "ot.fullname" . }}-zitadel-system-api-users
         {{- if .Values.zitadel.login.enabled }}
         - name: login-client-cert
           secret:
@@ -56,10 +65,13 @@ spec:
             items:
               - key: tls.crt
                 path: tls.crt
-        - name: system-api-users-config
-          configMap:
-            name: {{ include "ot.fullname" . }}-zitadel-system-api-users
         {{- end }}
+        - name: bootstrap-system-key
+          secret:
+            secretName: {{ printf "%s-zitadel-bootstrap-system-key" (include "ot.fullname" .) }}
+            items:
+              - key: tls.key
+                path: tls.key
       containers:
         - name: zitadel
           image: "{{ .Values.zitadel.image.repository }}:{{ .Values.zitadel.image.tag }}"
@@ -67,19 +79,20 @@ spec:
           args:
             - start-from-init
             - --masterkeyFromEnv
-            {{- if .Values.zitadel.login.enabled }}
             - --config
             - /config/system-api-users.yaml
-            {{- end }}
           volumeMounts:
             - name: pat
               mountPath: /pat
-            {{- if .Values.zitadel.login.enabled }}
-            - name: login-client-cert
-              mountPath: /login-client-cert
+            - name: bootstrap-system-key-cert
+              mountPath: /bootstrap-system-key
               readOnly: true
             - name: system-api-users-config
               mountPath: /config
+              readOnly: true
+            {{- if .Values.zitadel.login.enabled }}
+            - name: login-client-cert
+              mountPath: /login-client-cert
               readOnly: true
             {{- end }}
           envFrom:
@@ -176,7 +189,7 @@ spec:
           # rather than exiting itself. A Deployment can't set restartPolicy per-container, so an
           # exiting container restart-loops forever, which keeps the pod's Ready condition false
           # and pulls it out of svc/zitadel's endpoints even though the zitadel container is healthy.
-          command: ["sh", "-c", "pip install --no-cache-dir requests==2.32.3 && python /scripts/bootstrap.py; sleep infinity"]
+          command: ["sh", "-c", "pip install --no-cache-dir requests==2.32.3 'PyJWT[crypto]'==2.10.1 && python /scripts/bootstrap.py; sleep infinity"]
           env:
             # Zitadel validates the request Host header against ZITADEL_EXTERNALDOMAIN
             # (anti-DNS-rebinding protection) and 404s otherwise. The sidecar connects
@@ -188,6 +201,17 @@ spec:
             # pod lifetime — see bootstrap.py's get_pat_from_secret()/save_pat_to_secret().
             - name: ZITADEL_PAT_SECRET_NAME
               value: {{ printf "%s-zitadel-pat" (include "ot.fullname" .) | quote }}
+            # Zitadel's system-JWT audience check requires an exact string match against
+            # core's own external URL. Port is only appended when it isn't the scheme's
+            # default -- identical logic to zitadel-login-configmap.yaml's AUDIENCE, which
+            # this must match exactly since both are validated by the same core check
+            # (confirmed live during Task 8 of the parent plan: a missing port on a
+            # non-default port caused every call to 401 with "audience is not valid").
+            {{- $extPort := int .Values.zitadel.externalPort }}
+            {{- $extSecure := .Values.zitadel.externalSecure }}
+            {{- $isDefaultPort := or (and $extSecure (eq $extPort 443)) (and (not $extSecure) (eq $extPort 80)) }}
+            - name: ZITADEL_SYSTEM_API_AUDIENCE
+              value: {{ printf "http%s://%s%s" (ternary "s" "" $extSecure) (.Values.zitadel.externalDomain | default (printf "zitadel.%s.svc.cluster.local" .Release.Namespace)) (ternary "" (printf ":%d" $extPort) $isDefaultPort) | quote }}
             {{- if .Values.zitadel.login.enabled }}
             - name: ZITADEL_LOGIN_V2_BASE_URI
               # publicBaseUri is an explicit opt-in override for environments that expose
@@ -201,4 +225,7 @@ spec:
               mountPath: /pat
             - name: bootstrap-script
               mountPath: /scripts
+            - name: bootstrap-system-key
+              mountPath: /bootstrap-system-key
+              readOnly: true
 {{- end }}
