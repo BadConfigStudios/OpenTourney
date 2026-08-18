@@ -567,15 +567,22 @@ def main():
     else:
         print("ZITADEL_LOGIN_V2_BASE_URI unset (zitadel.login.enabled=false) -- skipping Login V2 feature enable")
 
-    instance_id = get_instance_id(session)
-    system_api_token = get_system_api_token()
-    add_custom_domain(instance_id, "zitadel", system_api_token)
-    print("instance domain 'zitadel' added (lets in-cluster callers use the internal Service name)")
-
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)
     set_trigger(session, 2, 5, action_id)
     print("roles-claim action attached to both Complement Token triggers")
+
+    # Ordered last deliberately: add_custom_domain's idempotent already-exists check
+    # matches on response message text that's only been confirmed live on a first
+    # run, not yet a second one (see add_custom_domain's own comment). If that text
+    # match is ever wrong, raise_for_status() fires here -- but by this point every
+    # more essential call above has already completed and survives a pod restart via
+    # the idempotent get-or-create pattern, instead of a failure here blocking
+    # test users/roles/the roles-claim Action every single retry.
+    instance_id = get_instance_id(session)
+    system_api_token = get_system_api_token()
+    add_custom_domain(instance_id, "zitadel", system_api_token)
+    print("instance domain 'zitadel' added (lets in-cluster callers use the internal Service name)")
 
     print("bootstrap complete")
 
