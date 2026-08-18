@@ -2,21 +2,45 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
-import { AuthProvider } from "../auth/AuthContext";
+import type { User } from "oidc-client-ts";
+import { AuthProvider, type MinimalUserManager } from "../auth/AuthContext";
 import { ConfigProvider } from "../config/ConfigProvider";
+import type { PersonaRole } from "../config/types";
 
 function NavigatedTo() {
   const location = useLocation();
   return <div data-testid="navigated-to">{location.pathname}</div>;
 }
 
+function fakeUser(role: PersonaRole): User {
+  return { access_token: "test-access-token", expired: false, profile: { roles: [role] } } as unknown as User;
+}
+
+function fakeUserManager(role: PersonaRole | null): MinimalUserManager {
+  const user = role ? fakeUser(role) : null;
+  return {
+    getUser: () => Promise.resolve(user),
+    signinRedirect: () => Promise.resolve(),
+    signinRedirectCallback: () => Promise.resolve(user ?? fakeUser("organizer")),
+    removeUser: () => Promise.resolve(),
+  };
+}
+
 export function renderWithProviders(
   element: ReactElement,
-  options: { path?: string; routePath?: string; personaLabel?: string; queryClient?: QueryClient } = {},
+  options: {
+    path?: string;
+    routePath?: string;
+    // undefined = authenticated as "organizer" (the old default persona);
+    // an explicit PersonaRole = authenticated as that role; null = unauthenticated.
+    role?: PersonaRole | null;
+    // Escape hatch for tests that need custom async behavior (e.g. a rejecting
+    // signinRedirectCallback) beyond what the role-based fake above supports.
+    userManagerOverride?: MinimalUserManager;
+    queryClient?: QueryClient;
+  } = {},
 ) {
-  if (options.personaLabel) {
-    localStorage.setItem("opentourney.persona", options.personaLabel);
-  }
+  const role = options.role === undefined ? "organizer" : options.role;
 
   const queryClient =
     options.queryClient ??
@@ -37,7 +61,7 @@ export function renderWithProviders(
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider>
-        <AuthProvider>
+        <AuthProvider userManagerOverride={options.userManagerOverride ?? fakeUserManager(role)}>
           <RouterProvider router={router} />
         </AuthProvider>
       </ConfigProvider>
