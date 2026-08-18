@@ -285,9 +285,21 @@ SYSTEM_API_AUDIENCE = os.environ["ZITADEL_SYSTEM_API_AUDIENCE"]
 
 def get_system_api_token():
     # System API auth is separate from the PAT used everywhere else in this
-    # file: a JWT-bearer assertion (RFC 7523), signed with the private half
-    # of the keypair core trusts via SystemAPIUsers (see
-    # charts/opentourney/templates/zitadel-system-api-users-configmap.yaml).
+    # file, and separate from a normal OAuth2 JWT-bearer grant too -- no
+    # token exchange happens. Zitadel's request-authorization path
+    # (internal/api/authz/context.go's VerifyTokenAndCreateCtxData) tries the
+    # Bearer value as a real access token first, and on failure falls back to
+    # verifying it directly as a self-signed JWT assertion against the
+    # SystemAPIUsers config (see
+    # charts/opentourney/templates/zitadel-system-api-users-configmap.yaml) --
+    # confirmed by reading that function and internal/api/authz/system_token.go
+    # directly, after POSTing this same assertion to /oauth/v2/token (the
+    # normal OAuth2 JWT-bearer grant flow) failed live with
+    # "invalid_grant: invalid assertion" / "Errors.AuthNKey.NotFound": that
+    # endpoint is Zitadel's unrelated *database-registered machine user* key
+    # flow, not the System API's static-config one. The signed JWT itself
+    # *is* the Bearer token; nothing to exchange it for.
+    #
     # Needed because AddCustomDomain (below) requires the `system.domain.write`
     # permission, which only the built-in SYSTEM_OWNER role grants -- the PAT's
     # IAM_OWNER-equivalent role (used for every other call in this file)
@@ -296,7 +308,7 @@ def get_system_api_token():
     with open(SYSTEM_API_KEY_PATH) as f:
         private_key = f.read()
     now = int(time.time())
-    assertion = jwt.encode(
+    return jwt.encode(
         {
             "iss": SYSTEM_API_USER,
             "sub": SYSTEM_API_USER,
@@ -307,22 +319,6 @@ def get_system_api_token():
         private_key,
         algorithm="RS256",
     )
-    # Not the shared `session` -- this exchange carries no PAT Authorization
-    # header and needs form encoding, not JSON. Still needs the same Host
-    # header spoof every other call in this file uses (anti-DNS-rebinding).
-    response = requests.post(
-        f"{ZITADEL_BASE}/oauth/v2/token",
-        headers={"Host": ZITADEL_EXTERNAL_DOMAIN},
-        data={
-            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-            "assertion": assertion,
-            "scope": "openid",
-        },
-    )
-    if not response.ok:
-        print(f"POST /oauth/v2/token (system API) -> {response.status_code}: {response.text}", file=sys.stderr)
-    response.raise_for_status()
-    return response.json()["access_token"]
 
 
 def add_custom_domain(instance_id, domain, system_api_token):
