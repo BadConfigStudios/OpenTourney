@@ -4,7 +4,7 @@ import { ConfigProvider, useConfig } from "./ConfigProvider";
 
 function Probe() {
   const config = useConfig();
-  return <div>{config.personas.map((p) => p.label).join(",")}</div>;
+  return <div>{config.oidcClientId}</div>;
 }
 
 describe("ConfigProvider", () => {
@@ -15,9 +15,7 @@ describe("ConfigProvider", () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              personas: [{ label: "Organizer", role: "organizer", token: "t" }],
-            }),
+            Promise.resolve({ oidcAuthority: "http://zitadel.test", oidcClientId: "test-client-id" }),
         }),
       ) as unknown as typeof fetch,
     );
@@ -34,7 +32,7 @@ describe("ConfigProvider", () => {
       </ConfigProvider>,
     );
 
-    await waitFor(() => expect(screen.getByText("Organizer")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("test-client-id")).toBeInTheDocument());
   });
 
   it("shows a fatal error if config.json fails to load", async () => {
@@ -54,10 +52,12 @@ describe("ConfigProvider", () => {
     );
   });
 
-  it("shows a fatal error if config.json has no personas", async () => {
+  it("shows a fatal error if config.json has no oidcAuthority", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) })) as unknown as typeof fetch,
+      vi.fn(() =>
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ oidcClientId: "test-client-id" }) }),
+      ) as unknown as typeof fetch,
     );
 
     render(
@@ -71,16 +71,13 @@ describe("ConfigProvider", () => {
     );
   });
 
-  it("shows a fatal error if a persona has an empty token (e.g. unset envsubst var)", async () => {
+  it("shows a fatal error if config.json has an empty oidcClientId (e.g. unset envsubst var)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
         Promise.resolve({
           ok: true,
-          json: () =>
-            Promise.resolve({
-              personas: [{ label: "Organizer", role: "organizer", token: "" }],
-            }),
+          json: () => Promise.resolve({ oidcAuthority: "http://zitadel.test", oidcClientId: "" }),
         }),
       ) as unknown as typeof fetch,
     );
