@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router";
+import { Callback } from "./Callback";
 import { EventDetail } from "./EventDetail";
 import { EventList } from "./EventList";
 import { Layout } from "./Layout";
@@ -9,6 +10,7 @@ import { Pairings } from "./Pairings";
 import { Report } from "./Report";
 
 export const router = createBrowserRouter([
+  { path: "/callback", element: <Callback /> },
   {
     path: "/",
     element: <Layout />,
