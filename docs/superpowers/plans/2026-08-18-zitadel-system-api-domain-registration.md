@@ -6,6 +6,8 @@
 
 **Architecture:** Reuses the exact `SystemAPIUsers` X.509-JWT mechanism already live in this chart for Login V2 (`zitadel-system-api-users-configmap.yaml`, `genSelfSignedCert`-based keypair Secret with lookup-reuse-on-upgrade) — a second system user (`opentourney-bootstrap`, `SYSTEM_OWNER` role) added to the same config, trusted via a second chart-generated keypair. `bootstrap.py` signs a JWT-bearer assertion with the private half, exchanges it at `/oauth/v2/token` for a system-scoped access token, and calls `AddCustomDomain` with it instead of the wrong `AddTrustedDomain` call it currently makes.
 
+> **Deviation (as-built):** the `/oauth/v2/token` exchange described above does not exist as a mechanism — commit `326d9fd` (same PR) fixed this after it failed live with `invalid_grant: invalid assertion`. The signed JWT is presented directly as the `Authorization: Bearer` value on the System API call; there is no token exchange step.
+
 **Tech Stack:** Helm (`genSelfSignedCert` Sprig function, existing chart patterns), Python (`bootstrap.py` — adds `PyJWT[crypto]`), Zitadel Instance Service v2beta (`AddCustomDomain`) + OAuth2 JWT Bearer grant (RFC 7523).
 
 ## Global Constraints
@@ -421,6 +423,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ---
 
 ### Task 3: `bootstrap.py` — sign System API JWT, call the real `AddCustomDomain`
+
+> **Deviation (as-built):** `get_system_api_token()` does not exchange the assertion at `/oauth/v2/token` — see the Architecture note above. It returns the signed JWT itself, used directly as the Bearer token in `add_custom_domain`'s request (commit `326d9fd`).
 
 **Files:**
 - Modify: `charts/opentourney/files/bootstrap.py:33-40` (imports)

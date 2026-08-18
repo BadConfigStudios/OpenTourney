@@ -49,34 +49,44 @@ instance), so the practical blast radius of a `SYSTEM_OWNER` credential is
 
 ### Keypair
 
-One RSA keypair, generated once via `openssl` this session, never committed
-to git (same handling as `zitadel.masterkey`/admin password today — real
-values only ever exist as `--set-string` CLI args and live k8s Secret data,
-never in a tracked file).
+Actually built: a chart-generated keypair, not an `openssl`-generated one.
+`charts/opentourney/templates/zitadel-bootstrap-system-key-secret.yaml` uses
+Helm's `genSelfSignedCert` to create the RSA keypair at template-render time
+and stores it as a dedicated `kubernetes.io/tls` Secret
+(`<release>-zitadel-bootstrap-system-key`). A `lookup`-based reuse block
+keeps the same keypair across `helm upgrade` runs (mirroring
+`zitadel-login-secret.yaml`'s identical pattern) — a new cert on every
+upgrade would break core Zitadel's trust of `bootstrap.py`'s JWTs until both
+sides picked up the new cert simultaneously. Nothing is ever generated via
+CLI/`openssl` or passed through `--set-string`.
 
 ### Zitadel core config
 
-`charts/opentourney/templates/zitadel-secret.yaml` gains two new
-`stringData` keys, following the exact pattern `ZITADEL_MASTERKEY` already
-uses:
-
-- `ZITADEL_SYSTEM_API_PRIVATE_KEY` — consumed only by the `bootstrap`
-  sidecar container.
-- `ZITADEL_SYSTEM_API_PUBLIC_KEY` — consumed only by the `zitadel` core
-  container, templated into a `ZITADEL_SYSTEMAPIUSERS` env var:
-  ```
-  ZITADEL_SYSTEMAPIUSERS={"opentourney-bootstrap":{"KeyData":"<base64 pubkey>","Memberships":[{"MemberType":"System","Roles":["SYSTEM_OWNER"]}]}}
-  ```
+No new `stringData` keys on `zitadel-secret.yaml`, and no
+`ZITADEL_SYSTEMAPIUSERS` env var. Instead, this reuses the pre-existing
+`SystemAPIUsers` / `--config` file mechanism:
+`charts/opentourney/templates/zitadel-system-api-users-configmap.yaml`
+gains an `opentourney-bootstrap` entry pointing at the cert's mounted path
+(`/bootstrap-system-key/tls.crt`) with `MemberType: System` /
+`Roles: [SYSTEM_OWNER]`, alongside the existing `login-client` entry. The
+core `zitadel` container already runs with `--config
+/config/system-api-users.yaml` (see `zitadel-deployment.yaml`); the new
+Secret is mounted into that same container so the config file's `Path`
+resolves.
 
 ### bootstrap.py
 
 - New pip dependency: `pyjwt[crypto]` (added to the script's existing
   one-shot `pip install` line alongside `requests`).
-- New function `get_system_api_token(session)`: builds a signed JWT
-  assertion (`iss=sub="opentourney-bootstrap"`, `aud=<issuer>`, short
-  expiry), POSTs it to `/oauth/v2/token`
-  (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&scope=openid`),
-  returns the resulting access token.
+- New function `get_system_api_token()`: builds a signed JWT assertion
+  (`iss=sub="opentourney-bootstrap"`, `aud=<ZITADEL_SYSTEM_API_AUDIENCE>`,
+  short expiry). Actually built: no token exchange. The signed JWT itself is
+  presented directly as the `Authorization: Bearer` value on the System API
+  call — confirmed live (commit `326d9fd`) after `POST /oauth/v2/token`
+  failed with `invalid_grant: invalid assertion` / `Errors.AuthNKey.NotFound`,
+  since that endpoint is Zitadel's unrelated database-registered
+  machine-user key flow, not the System API's static-config
+  (`SystemAPIUsers`) one.
 - `add_trusted_domain` (currently calling the wrong endpoint) is replaced
   by `add_custom_domain(session, instance_id, domain)`, calling
   `POST /v2beta/instances/{id}/custom-domains` with the system API token as
@@ -90,11 +100,10 @@ uses:
 
 ### staging-upgrade.sh
 
-Two new `secret()` reads for the new keys, passed through as
-`--set-string` alongside the existing four. First-ever rollout after this
-change seeds them manually with the freshly generated keypair (one-time,
-documented in the SDD ledger, not committed); every rollout after that
-self-perpetuates via the live-secret read, same as today.
+No changes needed. Since the keypair is chart-generated
+(`genSelfSignedCert` + `lookup`-based reuse, see Keypair above) rather than
+supplied via `--set-string`, there's nothing new for `staging-upgrade.sh` to
+read from the live cluster or pass through.
 
 ### Error handling
 
