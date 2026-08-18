@@ -275,6 +275,15 @@ def get_or_create_application(session, project_id, name, app_type, redirect_uris
         "redirectUris": redirect_uris,
         "responseTypes": body["responseTypes"],
         "grantTypes": body["grantTypes"],
+        # appType IS a live, resettable field on UpdateOIDCAppConfig (proto field 6) --
+        # omitting it doesn't leave the existing value alone, it gets coerced to
+        # OIDC_APP_TYPE_WEB (enum zero value, not an UNSPECIFIED sentinel) on every
+        # self-heal PUT. Since this function runs on every bootstrap sidecar restart
+        # (the normal case after the first successful run, not an edge case), omitting
+        # this silently resets opentourney-cli (NATIVE) and opentourney-frontend
+        # (USER_AGENT) to WEB on the second-and-later bootstrap run (caught in code
+        # review, PR #90).
+        "appType": body["appType"],
         "authMethodType": body["authMethodType"],
         "accessTokenType": body["accessTokenType"],
     }

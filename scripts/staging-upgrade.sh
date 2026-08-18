@@ -38,12 +38,16 @@ secret() {
   echo "$value"
 }
 
-DATABASE_URL=$(secret opentourney-staging-opentourney-secrets DATABASE_URL)
-OIDC_AUDIENCE=$(secret opentourney-staging-opentourney-secrets OIDC_AUDIENCE)
-OIDC_ISSUER=$(secret opentourney-staging-opentourney-secrets OIDC_ISSUER)
-OIDC_JWKS_URL=$(secret opentourney-staging-opentourney-secrets OIDC_JWKS_URL)
-ZITADEL_MASTERKEY=$(secret opentourney-staging-opentourney-zitadel-secrets ZITADEL_MASTERKEY)
-ZITADEL_ADMIN_PASSWORD=$(secret opentourney-staging-opentourney-zitadel-secrets ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD)
+# Secret names follow the chart's ot.fullname pattern (<release>-opentourney-*) --
+# derived from $RELEASE rather than hardcoded, so overriding RELEASE actually
+# targets that release's own secrets instead of silently reading opentourney-staging's
+# (caught in code review, PR #90).
+DATABASE_URL=$(secret "${RELEASE}-opentourney-secrets" DATABASE_URL)
+OIDC_AUDIENCE=$(secret "${RELEASE}-opentourney-secrets" OIDC_AUDIENCE)
+OIDC_ISSUER=$(secret "${RELEASE}-opentourney-secrets" OIDC_ISSUER)
+OIDC_JWKS_URL=$(secret "${RELEASE}-opentourney-secrets" OIDC_JWKS_URL)
+ZITADEL_MASTERKEY=$(secret "${RELEASE}-opentourney-zitadel-secrets" ZITADEL_MASTERKEY)
+ZITADEL_ADMIN_PASSWORD=$(secret "${RELEASE}-opentourney-zitadel-secrets" ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD)
 
 CURRENT_VALUES=$(helm --kube-context "$CONTEXT" -n "$NAMESPACE" get values "$RELEASE" -o json)
 BACKEND_TAG=$(echo "$CURRENT_VALUES" | python3 -c "import sys,json; print(json.load(sys.stdin).get('backend',{}).get('image',{}).get('tag',''))")
