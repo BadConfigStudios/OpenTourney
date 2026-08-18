@@ -221,7 +221,35 @@ spec:
               # Login V2 externally (e.g. a Cloudflare tunnel route) -- browser redirects
               # from core need a URI the browser can actually reach, unlike the in-cluster
               # default below. Empty by default: most deploys never need this.
-              value: {{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000" (include "ot.fullname" .)) | quote }}
+              # Both branches include the /ui/v2/login suffix -- the only shape ever
+              # confirmed working live (issue #88 #1); a bare host 404s.
+              value: {{ .Values.zitadel.login.publicBaseUri | default (printf "http://%s-zitadel-login:3000/ui/v2/login" (include "ot.fullname" .)) | quote }}
+            {{- end }}
+            # opentourney-frontend's registered OIDC redirect URI (bootstrap.py). The
+            # frontend and Zitadel deliberately share one public origin (see
+            # gateway-ingress.yaml's single-hostname routing) -- reusing
+            # zitadel.externalSecure/externalPort for scheme/port is safe because the
+            # fail guard in gateway-ingress.yaml (issue #88 minor #8) requires
+            # ingress.hostname to equal zitadel.externalDomain whenever both are set.
+            # Only meaningful for a real browser login when a public ingress exists --
+            # without one there's no way to complete a real OIDC redirect anyway (this
+            # deploy mode is curl/port-forward-only already). Falls back to an
+            # in-cluster, non-functional-for-browser-login placeholder instead of
+            # hard-failing the render when ingress.enabled=false, restoring the
+            # pre-existing behavior of the hardcoded constant this env var replaced
+            # (which also never depended on ingress.hostname) -- confirmed live: this
+            # exact env var addition broke `zitadel.enabled=true, ingress.enabled=false`
+            # renders that worked before this PR.
+            {{- if .Values.ingress.enabled }}
+            - name: ZITADEL_FRONTEND_APP_REDIRECT_URI
+              value: {{ printf "%s/callback" (include "ot.zitadelOrigin" (dict "secure" .Values.zitadel.externalSecure "port" .Values.zitadel.externalPort "domain" (required "ingress.hostname is required when ingress.enabled=true (opentourney-frontend's OIDC redirect URI derives from it)" .Values.ingress.hostname))) | quote }}
+            {{- else }}
+            - name: ZITADEL_FRONTEND_APP_REDIRECT_URI
+              # frontend's in-cluster Service is named plainly "frontend" (see
+              # service-frontend.yaml), NOT "<release>-frontend" -- an earlier version
+              # of this fallback used the ot.fullname-prefixed form, which resolves to
+              # no Service at all (caught in code review, PR #90).
+              value: "http://frontend/callback"
             {{- end }}
           volumeMounts:
             - name: pat

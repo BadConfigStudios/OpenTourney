@@ -2,6 +2,9 @@
 {{- if not .Values.ingress.hostname }}
 {{- fail "ingress.hostname is required when ingress.enabled=true" }}
 {{- end }}
+{{- if and .Values.zitadel.enabled .Values.zitadel.externalDomain (ne .Values.ingress.hostname .Values.zitadel.externalDomain) }}
+{{- fail "ingress.hostname must equal zitadel.externalDomain when both are set -- Zitadel's anti-DNS-rebinding Host check 404s on any mismatch (this failure mode has already been debugged twice on this chart)" }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -15,7 +18,18 @@ spec:
       http:
         paths:
           {{- if .Values.zitadel.enabled }}
-          # Core Zitadel's own endpoints -- OIDC discovery, JWKS, authorize/token.
+          # Core Zitadel's own endpoints -- OIDC discovery, JWKS, authorize/token,
+          # userinfo/end_session (/oidc), and external IdP callbacks (/idps). Without
+          # these, requests fall through to the frontend's SPA catch-all and get a 200
+          # with the SPA shell instead of a real 404 from Zitadel (issue #88 #3) --
+          # silently breaking oidc-client-ts's userinfo/end_session calls (Phase 16
+          # PR2). Deliberately NOT routing /v2 (Zitadel's v2 gRPC-gateway management
+          # API -- users, sessions, orgs, instance features): security review on PR #90
+          # found no caller anywhere in this repo (bootstrap sidecar, Login V2, or the
+          # browser) that reaches it through the public Ingress -- every real call
+          # goes over in-cluster service DNS. Publishing an authenticated admin API
+          # surface with no current consumer is needless attack-surface expansion; add
+          # a narrow /v2/<specific-path> route later if a real caller needs one.
           - path: /oauth
             pathType: Prefix
             backend:
@@ -24,6 +38,20 @@ spec:
                 port:
                   number: 8080
           - path: /.well-known
+            pathType: Prefix
+            backend:
+              service:
+                name: zitadel
+                port:
+                  number: 8080
+          - path: /oidc
+            pathType: Prefix
+            backend:
+              service:
+                name: zitadel
+                port:
+                  number: 8080
+          - path: /idps
             pathType: Prefix
             backend:
               service:

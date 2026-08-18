@@ -12,11 +12,16 @@
 # script's own flags (helm applies later --set/--set-string flags last), e.g.:
 #   scripts/staging-upgrade.sh --set-string secrets.oidcAudience=<new-client-id>
 #   scripts/staging-upgrade.sh --set backend.image.tag=<tag> --set frontend.image.tag=<tag>
+#
+# CONTEXT/NAMESPACE/RELEASE are overridable via env vars (e.g. when
+# mcgee-local times out off-network, run `CONTEXT=mcgee-remote
+# scripts/staging-upgrade.sh`) -- each defaults to the values this script has
+# always used, so a bare invocation is unchanged.
 set -euo pipefail
 
-CONTEXT=mcgee-local
-NAMESPACE=opentourney-staging
-RELEASE=opentourney-staging
+CONTEXT="${CONTEXT:-mcgee-local}"
+NAMESPACE="${NAMESPACE:-opentourney-staging}"
+RELEASE="${RELEASE:-opentourney-staging}"
 CHART="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/charts/opentourney"
 
 secret() {
@@ -33,12 +38,16 @@ secret() {
   echo "$value"
 }
 
-DATABASE_URL=$(secret opentourney-staging-opentourney-secrets DATABASE_URL)
-OIDC_AUDIENCE=$(secret opentourney-staging-opentourney-secrets OIDC_AUDIENCE)
-OIDC_ISSUER=$(secret opentourney-staging-opentourney-secrets OIDC_ISSUER)
-OIDC_JWKS_URL=$(secret opentourney-staging-opentourney-secrets OIDC_JWKS_URL)
-ZITADEL_MASTERKEY=$(secret opentourney-staging-opentourney-zitadel-secrets ZITADEL_MASTERKEY)
-ZITADEL_ADMIN_PASSWORD=$(secret opentourney-staging-opentourney-zitadel-secrets ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD)
+# Secret names follow the chart's ot.fullname pattern (<release>-opentourney-*) --
+# derived from $RELEASE rather than hardcoded, so overriding RELEASE actually
+# targets that release's own secrets instead of silently reading opentourney-staging's
+# (caught in code review, PR #90).
+DATABASE_URL=$(secret "${RELEASE}-opentourney-secrets" DATABASE_URL)
+OIDC_AUDIENCE=$(secret "${RELEASE}-opentourney-secrets" OIDC_AUDIENCE)
+OIDC_ISSUER=$(secret "${RELEASE}-opentourney-secrets" OIDC_ISSUER)
+OIDC_JWKS_URL=$(secret "${RELEASE}-opentourney-secrets" OIDC_JWKS_URL)
+ZITADEL_MASTERKEY=$(secret "${RELEASE}-opentourney-zitadel-secrets" ZITADEL_MASTERKEY)
+ZITADEL_ADMIN_PASSWORD=$(secret "${RELEASE}-opentourney-zitadel-secrets" ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD)
 
 CURRENT_VALUES=$(helm --kube-context "$CONTEXT" -n "$NAMESPACE" get values "$RELEASE" -o json)
 BACKEND_TAG=$(echo "$CURRENT_VALUES" | python3 -c "import sys,json; print(json.load(sys.stdin).get('backend',{}).get('image',{}).get('tag',''))")

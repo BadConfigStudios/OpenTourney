@@ -101,8 +101,11 @@ alone:
   `charts/opentourney/values.yaml`)
 - kubectl context: `mcgee-local` (or `mcgee-remote` if off-network and
   `mcgee-local` times out)
-- Public URL: TBD — no Cloudflare Tunnel hostname is assigned yet. Until one
-  exists, reach the deployment via `kubectl port-forward`.
+- Public URL: `https://opentourney-staging.badconfig.com` (Cloudflare Tunnel
+  → the chart's `gateway-ingress.yaml`, path-routed to the frontend, core
+  Zitadel, and Login V2 — see `values.staging.yaml`'s `ingress`/`zitadel`
+  blocks). `kubectl port-forward` still works as a fallback (e.g. bypassing
+  the tunnel to isolate an ingress-vs-backend issue).
 
 ### Deploy workflow
 
@@ -123,7 +126,26 @@ alone:
    docker push ghcr.io/badconfigstudios/opentourney/docs:<tag>
    ```
 
-3. **Deploy/update the release**:
+3. **Deploy/update the release** — once the release already exists (true for
+   `opentourney-staging` today), prefer `scripts/staging-upgrade.sh`: it
+   pulls `secrets.databaseUrl`/`oidcAudience`/`oidcIssuer`/`oidcJwksUrl` and
+   the Zitadel masterkey/admin password straight from the live cluster's own
+   Secrets instead of re-pasting them by hand, and reuses whatever image
+   tags are currently deployed unless overridden:
+
+   ```bash
+   scripts/staging-upgrade.sh \
+     --set-string backend.image.tag=<tag> \
+     --set-string frontend.image.tag=<tag> \
+     --set-string docs.image.tag=<tag>
+   ```
+
+   Extra flags win over the script's own (Helm applies later `--set`/
+   `--set-string` flags last) — e.g. `--set-string secrets.oidcAudience=<new-client-id>`
+   after registering a new app.
+
+   For a *fresh* namespace stand-up (the script's `secret` lookups would
+   fail — nothing exists yet), fall back to the full manual command instead:
 
    ```bash
    helm upgrade --install opentourney-staging charts/opentourney \
@@ -145,15 +167,15 @@ alone:
    `secrets.databaseUrl` makes an unset/typo'd value fail the `helm upgrade`
    itself rather than silently deploying a broken release.
 
-   `<zitadel-issuer>` is `.Values.zitadel.externalDomain` prefixed with its
-   scheme and suffixed with its port (e.g.
-   `http://zitadel.opentourney-staging.svc.cluster.local:8080`) — in-cluster
-   only, since no public hostname exists yet (see Namespace & values below).
-   `<zitadel-issuer-hostname>` used in the steps below is just the bare
-   hostname part of this value (e.g. `zitadel.opentourney-staging.svc.cluster.local`).
+   `<zitadel-issuer>` is `values.staging.yaml`'s committed
+   `secrets.oidcIssuer`, `https://opentourney-staging.badconfig.com` — public
+   now (Phase 16 PR1), not in-cluster-only as an earlier version of this
+   section described.
    `<client-id-from-bootstrap-log>` comes from the Zitadel bootstrap
    sidecar's own log line, `application 'opentourney-cli' client_id=...`
-   (`kubectl --context mcgee-local -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`).
+   (`kubectl --context mcgee-local -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`)
+   — the frontend app's client_id is logged the same way, one line down,
+   `application 'opentourney-frontend' client_id=...`.
 
    **Ordering gotcha:** on a *fresh* Zitadel stand-up, the OIDC client
    doesn't exist until after Zitadel's pod comes up and its bootstrap sidecar
@@ -187,7 +209,10 @@ alone:
    kubectl --context mcgee-local -n opentourney-staging rollout status deployment/opentourney-staging-opentourney-backend
    ```
 
-4. **Verify** via `kubectl port-forward` (no public hostname yet):
+4. **Verify** via `kubectl port-forward` (or `curl`/browser against the public
+   URL, `https://opentourney-staging.badconfig.com` — see Namespace & values
+   above; port-forward remains useful for bypassing the tunnel to isolate an
+   ingress-vs-backend issue):
 
    ```bash
    kubectl --context mcgee-local -n opentourney-staging port-forward svc/backend 8000:8000
@@ -260,7 +285,9 @@ completes.
 
    Expected: a JSON body containing `access_token`.
 
-6. Port-forward the backend service (no public hostname yet):
+6. Port-forward the backend service (or call
+   `https://opentourney-staging.badconfig.com` directly — port-forward is
+   useful here to bypass the tunnel and isolate an ingress-vs-backend issue):
 
    ```bash
    kubectl --context mcgee-local -n opentourney-staging port-forward svc/backend 8000:8000
@@ -294,17 +321,23 @@ completes.
 outright (400 on step 3, before any login page renders), the client likely
 needs `"devMode": true` added to `get_or_create_application()`'s request
 body — Zitadel's default posture requires HTTPS redirect URIs for
-non-loopback apps, and this deployment (`ZITADEL_EXTERNALSECURE=false`)
-runs entirely over HTTP. Add the field, re-run the bootstrap Job/pod
-restart, and retry.
+non-loopback apps. Staging runs `zitadel.externalSecure: true` and the
+frontend's redirect URI is HTTPS (issue #88 #2), so this shouldn't be
+needed there; this note previously (incorrectly, for staging) assumed an
+HTTP-only deployment. If it does trigger, add the field to `body` in both
+`get_or_create_application()`'s create path and its `update_body` (the
+self-healing PUT), re-run the bootstrap Job/pod restart, and retry.
 
-**Troubleshooting a double `/ui/v2/login/ui/v2/login` redirect:** the
-bootstrap sidecar's `enable_login_v2_feature()` sets `loginV2.baseUri` to
-the bare login-service host (`http://<release>-zitadel-login:3000`) —
-Zitadel's `defaultBaseURL()` appends `/ui/v2/login` itself. If the browser
-lands on a doubled path, check
+**Troubleshooting a login redirect 404:** `loginV2.baseUri` (set by the
+bootstrap sidecar's `enable_login_v2_feature()`) MUST include the
+`/ui/v2/login` suffix, both for the in-cluster default
+(`http://<release>-zitadel-login:3000/ui/v2/login`) and any
+`zitadel.login.publicBaseUri` override -- a bare host without the suffix
+produces a 404 on login (issue #88 #1; a prior version of this note
+incorrectly claimed the suffix was appended automatically and should be
+omitted here). If login 404s, check
 `kubectl -n opentourney-staging exec deploy/opentourney-staging-opentourney-zitadel -c bootstrap -- env | grep ZITADEL_LOGIN_V2_BASE_URI`
-for a stray `/ui/v2/login` suffix and re-run the bootstrap sidecar.
+for a missing `/ui/v2/login` suffix and re-run the bootstrap sidecar.
 
 ### Known gotchas
 
