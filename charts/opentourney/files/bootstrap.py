@@ -504,8 +504,12 @@ def main():
     else:
         print("ZITADEL_LOGIN_V2_BASE_URI unset (zitadel.login.enabled=false) -- skipping Login V2 feature enable")
 
-    add_trusted_domain(session, "zitadel")
-    print("trusted domain 'zitadel' added (lets in-cluster callers use the internal Service name)")
+    # Port included -- confirmed live that Zitadel's trusted-domain match is
+    # against the literal Host header value a client sends, which includes
+    # the port for a non-default-port URL like http://zitadel:8080/...;
+    # "zitadel" alone (no port) did not match and still 404'd.
+    add_trusted_domain(session, "zitadel:8080")
+    print("trusted domain 'zitadel:8080' added (lets in-cluster callers use the internal Service name)")
 
     # Complement Token flow (2): Pre Userinfo Creation (4), Pre Access Token Creation (5)
     set_trigger(session, 2, 4, action_id)
