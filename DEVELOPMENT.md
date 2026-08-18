@@ -101,8 +101,11 @@ alone:
   `charts/opentourney/values.yaml`)
 - kubectl context: `mcgee-local` (or `mcgee-remote` if off-network and
   `mcgee-local` times out)
-- Public URL: TBD — no Cloudflare Tunnel hostname is assigned yet. Until one
-  exists, reach the deployment via `kubectl port-forward`.
+- Public URL: `https://opentourney-staging.badconfig.com` (Cloudflare Tunnel
+  → the chart's `gateway-ingress.yaml`, path-routed to the frontend, core
+  Zitadel, and Login V2 — see `values.staging.yaml`'s `ingress`/`zitadel`
+  blocks). `kubectl port-forward` still works as a fallback (e.g. bypassing
+  the tunnel to isolate an ingress-vs-backend issue).
 
 ### Deploy workflow
 
@@ -123,7 +126,26 @@ alone:
    docker push ghcr.io/badconfigstudios/opentourney/docs:<tag>
    ```
 
-3. **Deploy/update the release**:
+3. **Deploy/update the release** — once the release already exists (true for
+   `opentourney-staging` today), prefer `scripts/staging-upgrade.sh`: it
+   pulls `secrets.databaseUrl`/`oidcAudience`/`oidcIssuer`/`oidcJwksUrl` and
+   the Zitadel masterkey/admin password straight from the live cluster's own
+   Secrets instead of re-pasting them by hand, and reuses whatever image
+   tags are currently deployed unless overridden:
+
+   ```bash
+   scripts/staging-upgrade.sh \
+     --set-string backend.image.tag=<tag> \
+     --set-string frontend.image.tag=<tag> \
+     --set-string docs.image.tag=<tag>
+   ```
+
+   Extra flags win over the script's own (Helm applies later `--set`/
+   `--set-string` flags last) — e.g. `--set-string secrets.oidcAudience=<new-client-id>`
+   after registering a new app.
+
+   For a *fresh* namespace stand-up (the script's `secret` lookups would
+   fail — nothing exists yet), fall back to the full manual command instead:
 
    ```bash
    helm upgrade --install opentourney-staging charts/opentourney \
@@ -145,15 +167,15 @@ alone:
    `secrets.databaseUrl` makes an unset/typo'd value fail the `helm upgrade`
    itself rather than silently deploying a broken release.
 
-   `<zitadel-issuer>` is `.Values.zitadel.externalDomain` prefixed with its
-   scheme and suffixed with its port (e.g.
-   `http://zitadel.opentourney-staging.svc.cluster.local:8080`) — in-cluster
-   only, since no public hostname exists yet (see Namespace & values below).
-   `<zitadel-issuer-hostname>` used in the steps below is just the bare
-   hostname part of this value (e.g. `zitadel.opentourney-staging.svc.cluster.local`).
+   `<zitadel-issuer>` is `values.staging.yaml`'s committed
+   `secrets.oidcIssuer`, `https://opentourney-staging.badconfig.com` — public
+   now (Phase 16 PR1), not in-cluster-only as an earlier version of this
+   section described.
    `<client-id-from-bootstrap-log>` comes from the Zitadel bootstrap
    sidecar's own log line, `application 'opentourney-cli' client_id=...`
-   (`kubectl --context mcgee-local -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`).
+   (`kubectl --context mcgee-local -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`)
+   — the frontend app's client_id is logged the same way, one line down,
+   `application 'opentourney-frontend' client_id=...`.
 
    **Ordering gotcha:** on a *fresh* Zitadel stand-up, the OIDC client
    doesn't exist until after Zitadel's pod comes up and its bootstrap sidecar
