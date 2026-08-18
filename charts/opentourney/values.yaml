@@ -17,6 +17,12 @@ frontend:
     pullPolicy: Always
   replicas: 1
   port: 80
+  # Non-secret OIDC client metadata, injected into config.json at container
+  # start (see frontend/docker-entrypoint.d/40-oidc-config.sh). Both values
+  # are public in any browser's network tab during a real login -- no Secret.
+  oidc:
+    authority: ""
+    clientId: ""
 
 docs:
   image:

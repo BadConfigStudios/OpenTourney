@@ -25,6 +25,11 @@ spec:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          env:
+            - name: OIDC_AUTHORITY
+              value: {{ required "frontend.oidc.authority is required" .Values.frontend.oidc.authority | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ required "frontend.oidc.clientId is required" .Values.frontend.oidc.clientId | quote }}
           ports:
             - containerPort: {{ .Values.frontend.port }}
           readinessProbe:

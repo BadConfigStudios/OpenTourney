@@ -12,5 +12,8 @@ FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY config.json.template /usr/share/nginx/html/config.json.template
+COPY docker-entrypoint.d/40-oidc-config.sh /docker-entrypoint.d/40-oidc-config.sh
+RUN chmod +x /docker-entrypoint.d/40-oidc-config.sh
 
 EXPOSE 80
