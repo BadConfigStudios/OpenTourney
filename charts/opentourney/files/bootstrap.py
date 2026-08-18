@@ -285,19 +285,20 @@ def get_or_create_application(session, project_id, name, app_type, redirect_uris
         # error id for this case isn't yet confirmed live (unlike COMMAND-Nfh52/
         # ACTION-dg4t2 for the other two) -- matching on code==9 (gRPC
         # FailedPrecondition, the shared family both known ids belong to) is
-        # deliberately broader here until a real run confirms the specific id;
-        # if this ever masks a genuine error, the printed stderr line below
-        # still surfaces it for a human, since raise_for_status() only fires on
-        # a *different* status code, not on a 400 matched here.
+        # deliberately broader here until a real run confirms the specific id.
+        # The print below is unconditional on any 400 (not gated on code!=9)
+        # specifically so a genuine, non-"no changes" FailedPrecondition that
+        # happens to also carry code==9 still surfaces on stderr for a human,
+        # even though only a non-code-9 400 goes on to raise_for_status().
+        print(
+            f"PUT /projects/{project_id}/apps/{app_id}/oidc_config -> 400: {put_response.text}",
+            file=sys.stderr,
+        )
         try:
             put_body = put_response.json()
         except ValueError:
             put_body = {}
         if put_body.get("code") != 9:
-            print(
-                f"PUT /projects/{project_id}/apps/{app_id}/oidc_config -> 400: {put_response.text}",
-                file=sys.stderr,
-            )
             put_response.raise_for_status()
     elif not put_response.ok:
         print(
