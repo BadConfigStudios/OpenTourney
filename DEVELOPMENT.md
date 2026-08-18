@@ -209,7 +209,10 @@ alone:
    kubectl --context mcgee-local -n opentourney-staging rollout status deployment/opentourney-staging-opentourney-backend
    ```
 
-4. **Verify** via `kubectl port-forward` (no public hostname yet):
+4. **Verify** via `kubectl port-forward` (or `curl`/browser against the public
+   URL, `https://opentourney-staging.badconfig.com` — see Namespace & values
+   above; port-forward remains useful for bypassing the tunnel to isolate an
+   ingress-vs-backend issue):
 
    ```bash
    kubectl --context mcgee-local -n opentourney-staging port-forward svc/backend 8000:8000
@@ -282,7 +285,9 @@ completes.
 
    Expected: a JSON body containing `access_token`.
 
-6. Port-forward the backend service (no public hostname yet):
+6. Port-forward the backend service (or call
+   `https://opentourney-staging.badconfig.com` directly — port-forward is
+   useful here to bypass the tunnel and isolate an ingress-vs-backend issue):
 
    ```bash
    kubectl --context mcgee-local -n opentourney-staging port-forward svc/backend 8000:8000

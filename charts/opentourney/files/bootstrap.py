@@ -269,8 +269,8 @@ def get_or_create_application(session, project_id, name, app_type, redirect_uris
     # exactly the field that changes across bootstrap.py edits (issue #88 #2: this
     # PR's own FRONTEND_APP_REDIRECT_URI fix) -- a stale already-registered app would
     # otherwise keep rejecting the real client's callback forever. PUT the current
-    # config back on every run, the same self-healing pattern get_or_create_action()
-    # already uses for its ACTION_SOURCE script.
+    # config back on every run, a self-healing pattern adapted from
+    # get_or_create_action()'s ACTION_SOURCE self-heal below.
     update_body = {
         "redirectUris": redirect_uris,
         "responseTypes": body["responseTypes"],

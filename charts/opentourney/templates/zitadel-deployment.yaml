@@ -231,8 +231,17 @@ spec:
             # zitadel.externalSecure/externalPort for scheme/port is safe because the
             # fail guard in gateway-ingress.yaml (issue #88 minor #8) requires
             # ingress.hostname to equal zitadel.externalDomain whenever both are set.
+            # Only meaningful for a real browser login when a public ingress exists --
+            # without one there's no way to complete a real OIDC redirect anyway (this
+            # deploy mode is curl/port-forward-only already). Falls back to an
+            # in-cluster, non-functional-for-browser-login placeholder instead of
+            # hard-failing the render when ingress.enabled=false, restoring the
+            # pre-existing behavior of the hardcoded constant this env var replaced
+            # (which also never depended on ingress.hostname) -- confirmed live: this
+            # exact env var addition broke `zitadel.enabled=true, ingress.enabled=false`
+            # renders that worked before this PR.
             - name: ZITADEL_FRONTEND_APP_REDIRECT_URI
-              value: {{ printf "%s/callback" (include "ot.zitadelOrigin" (dict "secure" .Values.zitadel.externalSecure "port" .Values.zitadel.externalPort "domain" (required "ingress.hostname is required to register opentourney-frontend's OIDC redirect URI" .Values.ingress.hostname))) | quote }}
+              value: {{ if .Values.ingress.enabled }}{{ printf "%s/callback" (include "ot.zitadelOrigin" (dict "secure" .Values.zitadel.externalSecure "port" .Values.zitadel.externalPort "domain" (required "ingress.hostname is required when ingress.enabled=true (opentourney-frontend's OIDC redirect URI derives from it)" .Values.ingress.hostname))) | quote }}{{ else }}{{ printf "http://%s-frontend/callback" (include "ot.fullname" .) | quote }}{{ end }}
           volumeMounts:
             - name: pat
               mountPath: /pat
