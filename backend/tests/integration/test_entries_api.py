@@ -429,6 +429,35 @@ def test_organizer_creates_pokemon_entry_without_decklist_url(api_client, make_t
     assert response.status_code == 201
 
 
+def test_patch_entry_merges_metadata_preserving_decklist_url(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token, game_slug="pokemon-tcg")
+
+    entry_id = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {
+                "decklist_url": "https://my.limitlesstcg.com/shared/69f80675a2d4f984ff635738"
+            },
+        },
+        headers=_auth_headers(token),
+    ).json()["id"]
+
+    patch_response = api_client.patch(
+        f"/entries/{entry_id}",
+        json={"metadata": {"display_name": "New Name"}},
+        headers=_auth_headers(token),
+    )
+
+    assert patch_response.status_code == 200
+    metadata = patch_response.json()["metadata"]
+    assert metadata["display_name"] == "New Name"
+    assert metadata["decklist_url"] == "https://my.limitlesstcg.com/shared/69f80675a2d4f984ff635738"
+
+
 def test_pokemon_entry_rejects_non_limitless_decklist_url(api_client, make_token):
     token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
     pod_id = _create_pod(api_client, token, game_slug="pokemon-tcg")
