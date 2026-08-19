@@ -12,11 +12,15 @@ export function listPodsForEvent(apiFetch: ApiFetch, eventId: string): Promise<P
   return apiRequest(apiFetch, `/pods?event_id=${eventId}`);
 }
 
-export function createPod(apiFetch: ApiFetch, eventId: string): Promise<PodRead> {
+export function getPod(apiFetch: ApiFetch, podId: string): Promise<PodRead> {
+  return apiRequest(apiFetch, `/pods/${podId}`);
+}
+
+export function createPod(apiFetch: ApiFetch, eventId: string, gameSlug: string): Promise<PodRead> {
   return apiRequest(
     apiFetch,
     "/pods",
-    jsonInit("POST", { event_id: eventId, format_slug: "swiss", game_slug: "generic" }),
+    jsonInit("POST", { event_id: eventId, format_slug: "swiss", game_slug: gameSlug }),
   );
 }
 
