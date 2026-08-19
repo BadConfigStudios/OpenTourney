@@ -137,12 +137,23 @@ alone:
    scripts/staging-upgrade.sh \
      --set-string backend.image.tag=<tag> \
      --set-string frontend.image.tag=<tag> \
-     --set-string docs.image.tag=<tag>
+     --set-string docs.image.tag=<tag> \
+     --set-string frontend.oidc.clientId=<opentourney-frontend-client-id-from-bootstrap-log> \
+     --set-string frontend.oidc.projectId=<project-id-from-bootstrap-log>
    ```
 
    Extra flags win over the script's own (Helm applies later `--set`/
    `--set-string` flags last) — e.g. `--set-string secrets.oidcAudience=<new-client-id>`
-   after registering a new app.
+   after registering a new app. Both client_ids come from the same bootstrap log
+   (`kubectl -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap | grep client_id`),
+   one per app: `opentourney-cli` for the backend's `secrets.oidcAudience`, and
+   `opentourney-frontend` for the frontend's `frontend.oidc.clientId`. The
+   Zitadel project ID itself is logged earlier in the same bootstrap log, on
+   the line `project 'OpenTourney' id=<id>` (before either client_id line) —
+   it's required as `frontend.oidc.projectId` so the frontend can request the
+   reserved project-audience scope that makes its access tokens satisfy the
+   backend's `secrets.oidcAudience` check (see the `scope` comment in
+   `frontend/src/auth/AuthContext.tsx`).
 
    For a *fresh* namespace stand-up (the script's `secret` lookups would
    fail — nothing exists yet), fall back to the full manual command instead:
@@ -157,6 +168,8 @@ alone:
      --set-string secrets.databaseUrl=<database-url> \
      --set-string secrets.oidcIssuer=<zitadel-issuer> \
      --set-string secrets.oidcAudience=<client-id-from-bootstrap-log> \
+     --set-string frontend.oidc.clientId=<opentourney-frontend-client-id-from-bootstrap-log> \
+     --set-string frontend.oidc.projectId=<project-id-from-bootstrap-log> \
      --set-string secrets.oidcJwksUrl=<zitadel-issuer>/oauth/v2/keys \
      --set-string zitadel.masterkey=<32-char-masterkey> \
      --set-string zitadel.firstInstance.adminPassword=<admin-password>
@@ -171,11 +184,12 @@ alone:
    `secrets.oidcIssuer`, `https://opentourney-staging.badconfig.com` — public
    now (Phase 16 PR1), not in-cluster-only as an earlier version of this
    section described.
-   `<client-id-from-bootstrap-log>` comes from the Zitadel bootstrap
-   sidecar's own log line, `application 'opentourney-cli' client_id=...`
-   (`kubectl --context mcgee-local -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap`)
-   — the frontend app's client_id is logged the same way, one line down,
-   `application 'opentourney-frontend' client_id=...`.
+   `<client-id-from-bootstrap-log>` and `<opentourney-frontend-client-id-from-bootstrap-log>`
+   both come from the Zitadel bootstrap sidecar's own log lines
+   (`kubectl --context mcgee-local -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap | grep client_id`):
+   — `secrets.oidcAudience` is the backend's client_id from `application 'opentourney-cli' client_id=...`
+   — `frontend.oidc.clientId` is the frontend's client_id from `application 'opentourney-frontend' client_id=...`
+   (the next line in the same log output).
 
    **Ordering gotcha:** on a *fresh* Zitadel stand-up, the OIDC client
    doesn't exist until after Zitadel's pod comes up and its bootstrap sidecar
@@ -338,6 +352,26 @@ incorrectly claimed the suffix was appended automatically and should be
 omitted here). If login 404s, check
 `kubectl -n opentourney-staging exec deploy/opentourney-staging-opentourney-zitadel -c bootstrap -- env | grep ZITADEL_LOGIN_V2_BASE_URI`
 for a missing `/ui/v2/login` suffix and re-run the bootstrap sidecar.
+
+### Verifying the frontend login flow
+
+Manual walkthrough — confirms the full browser-based flow FR36 describes,
+not just the backend/curl path above.
+
+1. Open the deployed frontend's URL. Expect a full-page "Log in" button (no
+   more persona dropdown).
+2. Click it. Expect a redirect to Zitadel's real Login V2 page (PR1).
+3. Log in as `organizer@staging.local` (password from the bootstrap sidecar's
+   log). Expect a redirect back to `/callback`, then to `/`, landing on the
+   event list with the Organizer-only "Organizations" link visible.
+4. Repeat steps 1-3 as `scorekeeper@staging.local` and `player@staging.local`
+   in a private/incognito window (or after clearing sessionStorage) — confirm
+   each lands with the correct role-gated UI (no "Organizations" link,
+   no "New Event" button, etc., matching each route's existing role checks).
+5. Expire the session: clear the token from sessionStorage's `oidc.user:...`
+   key via devtools, then trigger any `apiFetch` call (e.g. navigate to a
+   page that queries the API). Expect an automatic redirect back to Zitadel's
+   login page, not an error screen.
 
 ### Known gotchas
 

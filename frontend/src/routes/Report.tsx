@@ -10,9 +10,9 @@ export function Report() {
   const { podId } = useParams<{ podId: string }>();
   if (!podId) throw new Error("Report rendered without a podId route param");
 
-  const { apiFetch, currentPersona } = useAuth();
+  const { apiFetch, currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const isOrganizer = currentPersona.role === "organizer";
+  const isOrganizer = currentUser.role === "organizer";
 
   const reportQuery = useQuery({
     queryKey: ["report", podId],

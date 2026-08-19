@@ -81,7 +81,7 @@ describe("NewEvent", () => {
   });
 
   it("redirects a non-Organizer persona away from the form", async () => {
-    renderWithProviders(<NewEvent />, { path: "/events/new", personaLabel: "Player" });
+    renderWithProviders(<NewEvent />, { path: "/events/new", role: "player" });
 
     expect(await screen.findByTestId("navigated-to")).toHaveTextContent("/");
   });

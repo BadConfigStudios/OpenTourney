@@ -28,20 +28,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         return response.json() as Promise<AppConfig>;
       })
       .then((config) => {
-        if (!Array.isArray(config.personas) || config.personas.length === 0) {
-          throw new Error("config.json has no personas or personas is not an array");
+        if (typeof config.oidcAuthority !== "string" || config.oidcAuthority.length === 0) {
+          throw new Error("config.json is missing oidcAuthority");
         }
-        const hasInvalidPersona = config.personas.some(
-          (persona) =>
-            typeof persona.label !== "string" ||
-            persona.label.length === 0 ||
-            typeof persona.role !== "string" ||
-            persona.role.length === 0 ||
-            typeof persona.token !== "string" ||
-            persona.token.length === 0,
-        );
-        if (hasInvalidPersona) {
-          throw new Error("config.json has a persona missing a non-empty label, role, or token");
+        if (typeof config.oidcClientId !== "string" || config.oidcClientId.length === 0) {
+          throw new Error("config.json is missing oidcClientId");
+        }
+        if (typeof config.oidcProjectId !== "string" || config.oidcProjectId.length === 0) {
+          throw new Error("config.json is missing oidcProjectId");
         }
         if (!cancelled) setState({ status: "ready", config });
       })

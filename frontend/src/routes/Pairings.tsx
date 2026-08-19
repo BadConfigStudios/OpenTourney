@@ -21,9 +21,9 @@ export function Pairings() {
   const { podId } = useParams<{ podId: string }>();
   if (!podId) throw new Error("Pairings rendered without a podId route param");
 
-  const { apiFetch, currentPersona } = useAuth();
+  const { apiFetch, currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const canReport = currentPersona.role === "organizer" || currentPersona.role === "scorekeeper";
+  const canReport = currentUser.role === "organizer" || currentUser.role === "scorekeeper";
   const [selectedRoundNumber, setSelectedRoundNumber] = useState<number | null>(null);
 
   const roundsQuery = useQuery({
@@ -48,7 +48,7 @@ export function Pairings() {
   const rounds = roundsQuery.data ?? [];
   const latestRound = rounds[rounds.length - 1];
 
-  const isOrganizer = currentPersona.role === "organizer";
+  const isOrganizer = currentUser.role === "organizer";
   const latestRoundHasUnreportedMatch =
     latestRound?.matches.some((match) => match.entry2_id !== null && match.result === "unreported") ?? false;
 

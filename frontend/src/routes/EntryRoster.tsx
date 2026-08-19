@@ -13,9 +13,9 @@ import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
 
 export function EntryRoster({ podId, podCompletedAt }: { podId: string; podCompletedAt: string | null }) {
-  const { apiFetch, currentPersona } = useAuth();
+  const { apiFetch, currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const isOrganizer = currentPersona.role === "organizer";
+  const isOrganizer = currentUser.role === "organizer";
 
   const {
     data: entries,
