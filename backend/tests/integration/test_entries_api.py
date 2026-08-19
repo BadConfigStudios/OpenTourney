@@ -8,7 +8,7 @@ def _auth_headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create_pod(api_client, token) -> str:
+def _create_pod(api_client, token, game_slug: str = "generic") -> str:
     org_id = api_client.post(
         "/organizations", json={"name": "Test Org"}, headers=_auth_headers(token)
     ).json()["id"]
@@ -19,7 +19,7 @@ def _create_pod(api_client, token) -> str:
     ).json()["id"]
     return api_client.post(
         "/pods",
-        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "generic"},
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": game_slug},
         headers=_auth_headers(token),
     ).json()["id"]
 
@@ -132,7 +132,7 @@ def test_entry_creation_rejects_pod_with_unregistered_game_slug_with_422_not_500
         headers=_auth_headers(token),
     ).json()["id"]
 
-    pod = Pod(event_id=uuid.UUID(event_id), format_slug="swiss", game_slug="pokemon-tcg")
+    pod = Pod(event_id=uuid.UUID(event_id), format_slug="swiss", game_slug="not-a-real-game-123")
     db_session.add(pod)
     db_session.commit()
 
@@ -385,3 +385,63 @@ def test_dropping_entry_in_completed_pod_is_conflict(api_client, make_token):
     response = api_client.post(f"/entries/{entry_id}/drop", headers=_auth_headers(token))
 
     assert response.status_code == 409
+
+
+def test_organizer_creates_pokemon_entry_with_valid_decklist_url(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token, game_slug="pokemon-tcg")
+
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {
+                "decklist_url": "https://my.limitlesstcg.com/shared/69f80675a2d4f984ff635738"
+            },
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    assert (
+        response.json()["metadata"]["decklist_url"]
+        == "https://my.limitlesstcg.com/shared/69f80675a2d4f984ff635738"
+    )
+
+
+def test_organizer_creates_pokemon_entry_without_decklist_url(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token, game_slug="pokemon-tcg")
+
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {},
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 201
+
+
+def test_pokemon_entry_rejects_non_limitless_decklist_url(api_client, make_token):
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    pod_id = _create_pod(api_client, token, game_slug="pokemon-tcg")
+
+    response = api_client.post(
+        "/entries",
+        json={
+            "pod_id": pod_id,
+            "player_uuid": str(uuid.uuid4()),
+            "source_system": "club-checkin",
+            "metadata": {"decklist_url": "https://example.com/my-deck"},
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422
