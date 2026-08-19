@@ -43,5 +43,15 @@ class PokemonGameModule(GameModule):
         if path_prefix is None or not parts.path.startswith(path_prefix):
             raise ValueError(_DECKLIST_URL_ERROR)
 
-        if not parts.path[len(path_prefix) :]:
+        # Extract the ID portion after the prefix
+        id_portion = parts.path[len(path_prefix) :]
+        if not id_portion:
+            raise ValueError(_DECKLIST_URL_ERROR)
+
+        # ID must be a single segment with no further slashes
+        if "/" in id_portion:
+            raise ValueError(_DECKLIST_URL_ERROR)
+
+        # Reject URLs with query strings or fragments
+        if parts.query or parts.fragment:
             raise ValueError(_DECKLIST_URL_ERROR)

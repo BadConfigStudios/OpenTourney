@@ -81,6 +81,33 @@ def test_pokemon_game_module_rejects_empty_id():
         module.validate_entry_metadata({"decklist_url": "https://limitlesstcg.com/decks/list/"})
 
 
+def test_pokemon_game_module_rejects_multi_segment_path():
+    module = PokemonGameModule()
+
+    with pytest.raises(ValueError, match="decklist_url"):
+        module.validate_entry_metadata(
+            {"decklist_url": "https://limitlesstcg.com/decks/list/28236/extra"}
+        )
+
+
+def test_pokemon_game_module_rejects_query_string():
+    module = PokemonGameModule()
+
+    with pytest.raises(ValueError, match="decklist_url"):
+        module.validate_entry_metadata(
+            {"decklist_url": "https://limitlesstcg.com/decks/list/28236?foo=bar"}
+        )
+
+
+def test_pokemon_game_module_rejects_fragment():
+    module = PokemonGameModule()
+
+    with pytest.raises(ValueError, match="decklist_url"):
+        module.validate_entry_metadata(
+            {"decklist_url": "https://limitlesstcg.com/decks/list/28236#anchor"}
+        )
+
+
 def test_pokemon_match_points_match_handbook_defaults():
     assert PokemonGameModule.WIN_POINTS == 3
     assert PokemonGameModule.TIE_POINTS == 1
