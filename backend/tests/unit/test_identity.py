@@ -82,6 +82,24 @@ def test_identity_from_claims_derives_a_uuid_for_a_non_uuid_sub():
     assert isinstance(identity.player_uuid, uuid.UUID)
 
 
+def test_identity_from_claims_derives_a_pinned_uuid_for_a_known_sub():
+    # Golden-value regression test: _IDENTITY_NAMESPACE (identity.py) must
+    # never change once any real identity has been derived from it, since
+    # every existing player_uuid is a function of it -- rotating it would
+    # silently orphan every prior grant (PodRole/OrganizationMember, etc.)
+    # from the identity that earned it. The other tests in this file only
+    # check relative properties (determinism, namespacing, passthrough) and
+    # would still pass even if the constant's literal value drifted (e.g. an
+    # accidental regeneration or bad merge) -- this pins the actual expected
+    # output for a fixed input so that drift fails loudly instead of
+    # silently reassigning production identities.
+    identity = identity_from_claims(
+        {"sub": "386717021213032479", "source_system": "zitadel", "roles": []}
+    )
+
+    assert identity.player_uuid == uuid.UUID("33b86a54-c704-5450-b7e1-606ff1b3bdc9")
+
+
 def test_identity_from_claims_derives_the_same_uuid_for_the_same_sub_every_time():
     # Determinism is required: a user's grant history (PodRole, etc.) is keyed
     # on player_uuid, so the same real-world identity must always map to the
@@ -106,6 +124,22 @@ def test_identity_from_claims_derives_different_uuids_for_the_same_sub_under_dif
     )
 
     assert zitadel_identity.player_uuid != other_identity.player_uuid
+
+
+def test_identity_from_claims_raises_for_an_empty_sub():
+    # A falsy sub (empty string, null) is not a real identity -- before the
+    # uuid5 fallback existed, uuid.UUID("") already raised ValueError and
+    # this was rejected. Without an explicit guard, the fallback would
+    # silently derive a real, usable player_uuid from a degenerate value,
+    # colliding every sub="" token for a given source_system onto the same
+    # identity.
+    with pytest.raises(AuthError, match="sub"):
+        identity_from_claims({"sub": "", "source_system": "zitadel", "roles": []})
+
+
+def test_identity_from_claims_raises_for_a_null_sub():
+    with pytest.raises(AuthError, match="sub"):
+        identity_from_claims({"sub": None, "source_system": "zitadel", "roles": []})
 
 
 def test_identity_from_claims_still_uses_a_uuid_sub_directly_unmodified():
