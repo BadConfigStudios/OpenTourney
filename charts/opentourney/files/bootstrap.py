@@ -212,15 +212,77 @@ def generate_password():
 
 
 def get_or_create_project(session):
-    result = api_post(session, "/projects", {"name": PROJECT_NAME})
+    # projectRoleAssertion is mandatory: without it, Zitadel never populates
+    # ctx.v1.user.grants for a token request against this project, so
+    # addRolesClaim's Action (below) silently sets an empty "roles" claim on
+    # every token regardless of the user's actual grants -- confirmed live by
+    # decoding a real access token (ctx.v1.user had no "id" field and
+    # ctx.v1.user.grants was null) until this flag was set, then immediately
+    # correct after. This is a project-level setting, distinct from (and not
+    # substitutable by) each app's own accessTokenRoleAssertion/
+    # idTokenRoleAssertion flags -- those alone were not sufficient.
+    result = api_post(
+        session, "/projects", {"name": PROJECT_NAME, "projectRoleAssertion": True}
+    )
     if result is not None:
         return result["id"]
     response = session.post(f"{MGMT}/projects/_search", json={})
     response.raise_for_status()
     for project in response.json().get("result", []):
         if project.get("name") == PROJECT_NAME:
-            return project["id"]
-    raise RuntimeError(f"project {PROJECT_NAME!r} 409'd on create but not found in search")
+            project_id = project["id"]
+            break
+    else:
+        raise RuntimeError(f"project {PROJECT_NAME!r} 409'd on create but not found in search")
+
+    # Self-heal for a project created before this flag existed (or by a
+    # pre-fix bootstrap run) -- PUT it back on every run, same pattern as
+    # get_or_create_application()'s redirect_uris/appType self-heal below.
+    # All three UpdateProject booleans are sent explicitly (not just
+    # projectRoleAssertion): UpdateOIDCAppConfig's PUT already taught this
+    # codebase that an omitted-but-live field is coerced to its proto3
+    # zero-value on every self-heal run rather than left alone (PR #90) --
+    # projectRoleCheck/hasProjectCheck are set to the same false defaults
+    # this fix was live-verified against, not left to that same fate.
+    put_response = session.put(
+        f"{MGMT}/projects/{project_id}",
+        json={
+            "name": PROJECT_NAME,
+            "projectRoleAssertion": True,
+            "projectRoleCheck": False,
+            "hasProjectCheck": False,
+        },
+    )
+    if put_response.status_code == 400:
+        # Same "No Changes" idempotency quirk documented on set_trigger()/
+        # get_or_create_application() -- PUTting back byte-identical config
+        # Zitadel already has returns 400, not a 200 no-op. UpdateProject's
+        # own error id for this case isn't yet confirmed live (unlike
+        # COMMAND-Nfh52/ACTION-dg4t2 for the other two) -- matching on
+        # code==9 (gRPC FailedPrecondition, the shared family both known ids
+        # belong to) is deliberately broader here until a real run confirms
+        # the specific id. The print below is unconditional on any 400 (not
+        # gated on code!=9) specifically so a genuine, non-"no changes"
+        # FailedPrecondition that happens to also carry code==9 still
+        # surfaces on stderr for a human, even though only a non-code-9 400
+        # goes on to raise_for_status().
+        print(
+            f"PUT /projects/{project_id} -> 400: {put_response.text}",
+            file=sys.stderr,
+        )
+        try:
+            put_body = put_response.json()
+        except ValueError:
+            put_body = {}
+        if put_body.get("code") != 9:
+            put_response.raise_for_status()
+    elif not put_response.ok:
+        print(
+            f"PUT /projects/{project_id} -> {put_response.status_code}: {put_response.text}",
+            file=sys.stderr,
+        )
+        put_response.raise_for_status()
+    return project_id
 
 
 def ensure_role(session, project_id, role):
