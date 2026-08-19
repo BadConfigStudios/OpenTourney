@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { displayNameFor, listEntries } from "../api/entries";
-import { completePod } from "../api/pods";
+import { completePod, getPod } from "../api/pods";
 import { fetchPodReport } from "../api/report";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
@@ -14,6 +14,10 @@ export function Report() {
   const queryClient = useQueryClient();
   const isOrganizer = currentUser.role === "organizer";
 
+  const podQuery = useQuery({
+    queryKey: ["pods", podId],
+    queryFn: () => getPod(apiFetch, podId),
+  });
   const reportQuery = useQuery({
     queryKey: ["report", podId],
     queryFn: () => fetchPodReport(apiFetch, podId),
@@ -41,7 +45,13 @@ export function Report() {
         </Link>
       </p>
       <h2 className="mb-4 text-lg font-semibold">Report</h2>
-      <ErrorBanner error={reportQuery.error ?? entriesQuery.error ?? completeMutation.error} />
+      <ErrorBanner error={reportQuery.error ?? entriesQuery.error ?? podQuery.error ?? completeMutation.error} />
+
+      {podQuery.data?.game_slug === "pokemon-tcg" && (
+        <p className="mb-4 rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+          Reported as best-of-1 by default — organizer discretion per Play! Pokémon rules §5.5.6.
+        </p>
+      )}
 
       {(reportQuery.isLoading || entriesQuery.isLoading) && <p>Loading…</p>}
 
