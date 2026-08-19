@@ -2,6 +2,7 @@ import pytest
 
 from app.games.base import GameModule
 from app.games.generic import GenericGameModule
+from app.games.pokemon import PokemonGameModule
 
 
 def test_game_module_is_abstract():
@@ -16,9 +17,6 @@ def test_generic_game_module_accepts_any_metadata():
     module.validate_entry_metadata({})
 
     assert module.slug == "generic"
-
-
-from app.games.pokemon import PokemonGameModule
 
 
 def test_pokemon_game_module_accepts_metadata_without_decklist_url():
