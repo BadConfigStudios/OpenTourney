@@ -212,15 +212,39 @@ def generate_password():
 
 
 def get_or_create_project(session):
-    result = api_post(session, "/projects", {"name": PROJECT_NAME})
+    # projectRoleAssertion is mandatory: without it, Zitadel never populates
+    # ctx.v1.user.grants for a token request against this project, so
+    # addRolesClaim's Action (below) silently sets an empty "roles" claim on
+    # every token regardless of the user's actual grants -- confirmed live by
+    # decoding a real access token (ctx.v1.user had no "id" field and
+    # ctx.v1.user.grants was null) until this flag was set, then immediately
+    # correct after. This is a project-level setting, distinct from (and not
+    # substitutable by) each app's own accessTokenRoleAssertion/
+    # idTokenRoleAssertion flags -- those alone were not sufficient.
+    result = api_post(
+        session, "/projects", {"name": PROJECT_NAME, "projectRoleAssertion": True}
+    )
     if result is not None:
         return result["id"]
     response = session.post(f"{MGMT}/projects/_search", json={})
     response.raise_for_status()
     for project in response.json().get("result", []):
         if project.get("name") == PROJECT_NAME:
-            return project["id"]
-    raise RuntimeError(f"project {PROJECT_NAME!r} 409'd on create but not found in search")
+            project_id = project["id"]
+            break
+    else:
+        raise RuntimeError(f"project {PROJECT_NAME!r} 409'd on create but not found in search")
+
+    # Self-heal for a project created before this flag existed (or by a
+    # pre-fix bootstrap run) -- PUT it back on every run, same pattern as
+    # get_or_create_application()'s redirect_uris/appType self-heal below.
+    put_response = session.put(
+        f"{MGMT}/projects/{project_id}",
+        json={"name": PROJECT_NAME, "projectRoleAssertion": True},
+    )
+    if put_response.status_code != 400:
+        put_response.raise_for_status()
+    return project_id
 
 
 def ensure_role(session, project_id, role):
