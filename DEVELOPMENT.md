@@ -138,7 +138,8 @@ alone:
      --set-string backend.image.tag=<tag> \
      --set-string frontend.image.tag=<tag> \
      --set-string docs.image.tag=<tag> \
-     --set-string frontend.oidc.clientId=<opentourney-frontend-client-id-from-bootstrap-log>
+     --set-string frontend.oidc.clientId=<opentourney-frontend-client-id-from-bootstrap-log> \
+     --set-string frontend.oidc.projectId=<project-id-from-bootstrap-log>
    ```
 
    Extra flags win over the script's own (Helm applies later `--set`/
@@ -146,7 +147,13 @@ alone:
    after registering a new app. Both client_ids come from the same bootstrap log
    (`kubectl -n opentourney-staging logs deploy/opentourney-staging-opentourney-zitadel -c bootstrap | grep client_id`),
    one per app: `opentourney-cli` for the backend's `secrets.oidcAudience`, and
-   `opentourney-frontend` for the frontend's `frontend.oidc.clientId`.
+   `opentourney-frontend` for the frontend's `frontend.oidc.clientId`. The
+   Zitadel project ID itself is logged earlier in the same bootstrap log, on
+   the line `project 'OpenTourney' id=<id>` (before either client_id line) —
+   it's required as `frontend.oidc.projectId` so the frontend can request the
+   reserved project-audience scope that makes its access tokens satisfy the
+   backend's `secrets.oidcAudience` check (see the `scope` comment in
+   `frontend/src/auth/AuthContext.tsx`).
 
    For a *fresh* namespace stand-up (the script's `secret` lookups would
    fail — nothing exists yet), fall back to the full manual command instead:
@@ -162,6 +169,7 @@ alone:
      --set-string secrets.oidcIssuer=<zitadel-issuer> \
      --set-string secrets.oidcAudience=<client-id-from-bootstrap-log> \
      --set-string frontend.oidc.clientId=<opentourney-frontend-client-id-from-bootstrap-log> \
+     --set-string frontend.oidc.projectId=<project-id-from-bootstrap-log> \
      --set-string secrets.oidcJwksUrl=<zitadel-issuer>/oauth/v2/keys \
      --set-string zitadel.masterkey=<32-char-masterkey> \
      --set-string zitadel.firstInstance.adminPassword=<admin-password>
@@ -357,10 +365,10 @@ not just the backend/curl path above.
    log). Expect a redirect back to `/callback`, then to `/`, landing on the
    event list with the Organizer-only "Organizations" link visible.
 4. Repeat steps 1-3 as `scorekeeper@staging.local` and `player@staging.local`
-   in a private/incognito window (or after clearing localStorage) — confirm
+   in a private/incognito window (or after clearing sessionStorage) — confirm
    each lands with the correct role-gated UI (no "Organizations" link,
    no "New Event" button, etc., matching each route's existing role checks).
-5. Expire the session: clear the token from localStorage's `oidc.user:...`
+5. Expire the session: clear the token from sessionStorage's `oidc.user:...`
    key via devtools, then trigger any `apiFetch` call (e.g. navigate to a
    page that queries the API). Expect an automatic redirect back to Zitadel's
    login page, not an error screen.

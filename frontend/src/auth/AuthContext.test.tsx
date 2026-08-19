@@ -21,7 +21,12 @@ function fakeConfigFetch() {
     "fetch",
     vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ oidcAuthority: "http://zitadel.test", oidcClientId: "test-client-id" }),
+      json: () =>
+        Promise.resolve({
+          oidcAuthority: "http://zitadel.test",
+          oidcClientId: "test-client-id",
+          oidcProjectId: "test-project-id",
+        }),
     }),
   );
 }
@@ -47,7 +52,12 @@ describe("AuthProvider", () => {
       if (typeof input === "string" && input === "/events") return fetchSpy(...args);
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ oidcAuthority: "http://zitadel.test", oidcClientId: "test-client-id" }),
+        json: () =>
+          Promise.resolve({
+            oidcAuthority: "http://zitadel.test",
+            oidcClientId: "test-client-id",
+            oidcProjectId: "test-project-id",
+          }),
       } as Response);
     });
 

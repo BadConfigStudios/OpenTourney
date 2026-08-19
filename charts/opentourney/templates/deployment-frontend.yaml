@@ -30,6 +30,8 @@ spec:
               value: {{ required "frontend.oidc.authority is required" .Values.frontend.oidc.authority | quote }}
             - name: OIDC_CLIENT_ID
               value: {{ required "frontend.oidc.clientId is required" .Values.frontend.oidc.clientId | quote }}
+            - name: OIDC_PROJECT_ID
+              value: {{ required "frontend.oidc.projectId is required" .Values.frontend.oidc.projectId | quote }}
           ports:
             - containerPort: {{ .Values.frontend.port }}
           readinessProbe:

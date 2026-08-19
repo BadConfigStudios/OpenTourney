@@ -10,6 +10,7 @@ describe("msw test server", () => {
     expect(body).toEqual({
       oidcAuthority: "http://zitadel.test",
       oidcClientId: "test-client-id",
+      oidcProjectId: "test-project-id",
     });
   });
 

@@ -34,6 +34,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (typeof config.oidcClientId !== "string" || config.oidcClientId.length === 0) {
           throw new Error("config.json is missing oidcClientId");
         }
+        if (typeof config.oidcProjectId !== "string" || config.oidcProjectId.length === 0) {
+          throw new Error("config.json is missing oidcProjectId");
+        }
         if (!cancelled) setState({ status: "ready", config });
       })
       .catch((error) => {

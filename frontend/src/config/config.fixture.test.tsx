@@ -19,4 +19,9 @@ describe("public/config.json fixture", () => {
     expect(typeof config.oidcClientId).toBe("string");
     expect(config.oidcClientId.length).toBeGreaterThan(0);
   });
+
+  it("has a non-empty oidcProjectId", () => {
+    expect(typeof config.oidcProjectId).toBe("string");
+    expect(config.oidcProjectId.length).toBeGreaterThan(0);
+  });
 });

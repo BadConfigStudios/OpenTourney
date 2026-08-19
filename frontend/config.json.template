@@ -1,4 +1,5 @@
 {
   "oidcAuthority": "${OIDC_AUTHORITY}",
-  "oidcClientId": "${OIDC_CLIENT_ID}"
+  "oidcClientId": "${OIDC_CLIENT_ID}",
+  "oidcProjectId": "${OIDC_PROJECT_ID}"
 }

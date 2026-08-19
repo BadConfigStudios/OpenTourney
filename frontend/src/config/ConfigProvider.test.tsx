@@ -15,7 +15,11 @@ describe("ConfigProvider", () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({ oidcAuthority: "http://zitadel.test", oidcClientId: "test-client-id" }),
+            Promise.resolve({
+              oidcAuthority: "http://zitadel.test",
+              oidcClientId: "test-client-id",
+              oidcProjectId: "test-project-id",
+            }),
         }),
       ) as unknown as typeof fetch,
     );
@@ -56,7 +60,10 @@ describe("ConfigProvider", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
-        Promise.resolve({ ok: true, json: () => Promise.resolve({ oidcClientId: "test-client-id" }) }),
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ oidcClientId: "test-client-id", oidcProjectId: "test-project-id" }),
+        }),
       ) as unknown as typeof fetch,
     );
 
@@ -77,7 +84,39 @@ describe("ConfigProvider", () => {
       vi.fn(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ oidcAuthority: "http://zitadel.test", oidcClientId: "" }),
+          json: () =>
+            Promise.resolve({
+              oidcAuthority: "http://zitadel.test",
+              oidcClientId: "",
+              oidcProjectId: "test-project-id",
+            }),
+        }),
+      ) as unknown as typeof fetch,
+    );
+
+    render(
+      <ConfigProvider>
+        <Probe />
+      </ConfigProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/failed to load app configuration/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("shows a fatal error if config.json has an empty oidcProjectId (e.g. unset envsubst var)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              oidcAuthority: "http://zitadel.test",
+              oidcClientId: "test-client-id",
+              oidcProjectId: "",
+            }),
         }),
       ) as unknown as typeof fetch,
     );

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -69,13 +70,25 @@ export function AuthProvider({
         client_id: config.oidcClientId,
         redirect_uri: `${window.location.origin}/callback`,
         response_type: "code",
-        scope: "openid profile email",
+        // The reserved urn:zitadel:iam:org:project:id:{projectId}:aud scope
+        // makes Zitadel include the project ID itself in the token's aud
+        // claim, alongside the requesting client_id -- required because the
+        // backend validates aud against secrets.oidcAudience, which is set
+        // to this same project ID (see DEVELOPMENT.md).
+        scope: `openid profile email urn:zitadel:iam:org:project:id:${config.oidcProjectId}:aud`,
         loadUserInfo: true,
+        // No silent_redirect_uri is wired up (no hidden iframe target), so
+        // disable oidc-client-ts's default automatic silent renewal --
+        // leaving it enabled would attempt a silent renew near token expiry
+        // that always fails silently; the app instead falls back to a full
+        // page redirect via handleSessionExpired on actual expiry.
+        automaticSilentRenew: false,
       }),
     [config, userManagerOverride],
   );
 
   const [state, setState] = useState<SessionState>({ status: "loading" });
+  const redirecting = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +107,8 @@ export function AuthProvider({
   }, [userManager]);
 
   const handleSessionExpired = useCallback(async () => {
+    if (redirecting.current) return;
+    redirecting.current = true;
     setState({ status: "unauthenticated" });
     await userManager.removeUser();
     await userManager.signinRedirect();

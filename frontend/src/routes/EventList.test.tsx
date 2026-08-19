@@ -22,7 +22,7 @@ describe("EventList", () => {
 
     expect(await screen.findByRole("link", { name: "Friday Standard" })).toHaveAttribute("href", "/events/1");
     expect(screen.getByRole("link", { name: "Regional Qualifier" })).toHaveAttribute("href", "/events/2");
-    // Default persona (personas[0] in public/config.json) is Organizer.
+    // renderWithProviders defaults role to "organizer" when unspecified.
     expect(screen.getByRole("link", { name: "New Event" })).toHaveAttribute("href", "/events/new");
   });
 

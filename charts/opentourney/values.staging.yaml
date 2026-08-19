@@ -15,11 +15,14 @@ frontend:
     pullPolicy: Always
   replicas: 1
   oidc:
-    authority: "http://zitadel.opentourney-staging.svc.cluster.local:8080"
-    # clientId is set per-deploy via --set-string frontend.oidc.clientId=<id>,
-    # the same pattern secrets.oidcAudience already uses (Phase 15) -- the
-    # opentourney-frontend app doesn't exist until Zitadel's bootstrap sidecar
-    # has run once, so it can't be a static values.yaml default.
+    authority: "https://opentourney-staging.badconfig.com"
+    # clientId and projectId are set per-deploy via
+    # --set-string frontend.oidc.clientId=<id> and
+    # --set-string frontend.oidc.projectId=<id>, the same pattern
+    # secrets.oidcAudience already uses (Phase 15) -- the opentourney-frontend
+    # app (and the Zitadel project itself) don't exist until Zitadel's
+    # bootstrap sidecar has run once, so neither can be a static values.yaml
+    # default.
 
 docs:
   image:
