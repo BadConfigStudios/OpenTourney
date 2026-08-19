@@ -108,6 +108,31 @@ def test_pokemon_game_module_rejects_fragment():
         )
 
 
+def test_pokemon_game_module_rejects_leading_whitespace():
+    module = PokemonGameModule()
+
+    with pytest.raises(ValueError, match="decklist_url"):
+        module.validate_entry_metadata(
+            {"decklist_url": " https://limitlesstcg.com/decks/list/28236"}
+        )
+
+
+def test_pokemon_game_module_rejects_embedded_tab():
+    module = PokemonGameModule()
+
+    with pytest.raises(ValueError, match="decklist_url"):
+        module.validate_entry_metadata(
+            {"decklist_url": "https://limitlesstcg.com/decks/list/\t28236"}
+        )
+
+
+def test_pokemon_game_module_rejects_malformed_url_with_friendly_message():
+    module = PokemonGameModule()
+
+    with pytest.raises(ValueError, match="decklist_url"):
+        module.validate_entry_metadata({"decklist_url": "https://[abc/shared/x"})
+
+
 def test_pokemon_match_points_match_handbook_defaults():
     assert PokemonGameModule.WIN_POINTS == 3
     assert PokemonGameModule.TIE_POINTS == 1

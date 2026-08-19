@@ -35,7 +35,14 @@ class PokemonGameModule(GameModule):
         if not isinstance(decklist_url, str):
             raise ValueError(_DECKLIST_URL_ERROR)
 
-        parts = urlsplit(decklist_url)
+        if decklist_url != decklist_url.strip() or any(c.isspace() for c in decklist_url):
+            raise ValueError(_DECKLIST_URL_ERROR)
+
+        try:
+            parts = urlsplit(decklist_url)
+        except ValueError:
+            raise ValueError(_DECKLIST_URL_ERROR) from None
+
         if parts.scheme != "https":
             raise ValueError(_DECKLIST_URL_ERROR)
 
