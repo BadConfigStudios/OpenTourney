@@ -1,0 +1,404 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tournament type="2" stage="5" version="1.84" gametype="TRADING_CARD_GAME" mode="PRERELEASE">
+	<data>
+		<name>CG League Night Casual Tournament</name>
+		<id>26-07-028929</id>
+		<city>Pflugerville</city>
+		<state>TX</state>
+		<country>United States</country>
+		<roundtime>30</roundtime>
+		<finalsroundtime>30</finalsroundtime>
+		<organizer popid="0000000" name="Test Organizer"/>
+		<startdate>07/28/2026</startdate>
+		<lessswiss>false</lessswiss>
+		<autotablenumber>false</autotablenumber>
+		<overflowtablestart>0</overflowtablestart>
+	</data>
+	<timeelapsed>7626</timeelapsed>
+	<players>
+		<player userid="4761859">
+			<firstname>Player1</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>06/20/2026 09:23:19</creationdate>
+			<lastmodifieddate>06/20/2026 09:23:19</lastmodifieddate>
+		</player>
+		<player userid="6100003">
+			<firstname>Player2</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:25:00</creationdate>
+			<lastmodifieddate>07/28/2026 17:25:00</lastmodifieddate>
+		</player>
+		<player userid="5706225">
+			<firstname>Player3</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:23:05</creationdate>
+			<lastmodifieddate>07/28/2026 17:23:05</lastmodifieddate>
+		</player>
+		<player userid="5739759">
+			<firstname>Player4</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:23:36</creationdate>
+			<lastmodifieddate>07/28/2026 17:23:36</lastmodifieddate>
+		</player>
+		<player userid="6366264">
+			<firstname>Player5</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:31:29</creationdate>
+			<lastmodifieddate>07/28/2026 17:31:29</lastmodifieddate>
+		</player>
+		<player userid="5131808">
+			<firstname>Player6</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<dropped>
+				<status>1</status>
+				<round>1</round>
+				<timestamp>07/28/2026 18:22:33</timestamp>
+			</dropped>
+			<creationdate>07/28/2026 17:22:32</creationdate>
+			<lastmodifieddate>07/28/2026 17:22:32</lastmodifieddate>
+		</player>
+		<player userid="747520">
+			<firstname>Player7</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:24:39</creationdate>
+			<lastmodifieddate>07/28/2026 17:24:39</lastmodifieddate>
+		</player>
+		<player userid="6366263">
+			<firstname>Player8</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:31:07</creationdate>
+			<lastmodifieddate>07/28/2026 18:19:38</lastmodifieddate>
+		</player>
+		<player userid="209678">
+			<firstname>Player9</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:23:51</creationdate>
+			<lastmodifieddate>07/28/2026 17:23:51</lastmodifieddate>
+		</player>
+		<player userid="6323138">
+			<firstname>Player10</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:21:59</creationdate>
+			<lastmodifieddate>07/28/2026 17:21:59</lastmodifieddate>
+		</player>
+		<player userid="5159871">
+			<firstname>Player11</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<dropped>
+				<status>1</status>
+				<round>1</round>
+				<timestamp>07/28/2026 18:22:26</timestamp>
+			</dropped>
+			<creationdate>07/28/2026 17:22:48</creationdate>
+			<lastmodifieddate>07/28/2026 17:22:48</lastmodifieddate>
+		</player>
+		<player userid="2120935">
+			<firstname>Player12</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:24:09</creationdate>
+			<lastmodifieddate>07/28/2026 17:24:09</lastmodifieddate>
+		</player>
+		<player userid="5737223">
+			<firstname>Player13</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:25:48</creationdate>
+			<lastmodifieddate>07/28/2026 19:55:47</lastmodifieddate>
+		</player>
+		<player userid="5768993">
+			<firstname>Player14</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:34:51</creationdate>
+			<lastmodifieddate>07/28/2026 17:34:51</lastmodifieddate>
+		</player>
+		<player userid="5768821">
+			<firstname>Player15</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:34:33</creationdate>
+			<lastmodifieddate>07/28/2026 17:34:33</lastmodifieddate>
+		</player>
+		<player userid="1617337">
+			<firstname>Player16</firstname>
+			<lastname>Anon</lastname>
+			<birthdate>01/01/2015</birthdate>
+			<starter>true</starter>
+			<creationdate>07/28/2026 17:22:14</creationdate>
+			<lastmodifieddate>07/28/2026 17:22:14</lastmodifieddate>
+		</player>
+	</players>
+	<pods>
+		<pod category="10" stage="2">
+			<poddata>
+				<startingtable>1</startingtable>
+				<playoff3rd4th>false</playoff3rd4th>
+				<subgroupcount>1</subgroupcount>
+				<additionalrounds>0</additionalrounds>
+				<blockedranges>
+				</blockedranges>
+			</poddata>
+			<subgroups>
+				<subgroup number="1">
+					<players>
+						<player userid="5768821" />
+						<player userid="209678" />
+						<player userid="5131808" />
+						<player userid="6366263" />
+						<player userid="1617337" />
+						<player userid="5706225" />
+						<player userid="5159871" />
+						<player userid="5739759" />
+						<player userid="4761859" />
+						<player userid="5737223" />
+						<player userid="5768993" />
+						<player userid="747520" />
+						<player userid="2120935" />
+						<player userid="6323138" />
+						<player userid="6366264" />
+						<player userid="6100003" />
+					</players>
+				</subgroup>
+			</subgroups>
+			<rounds>
+				<round number="1" type="2" stage="6" >
+					<timeleft>0</timeleft>
+					<pairtime>07/28/2026 17:37:51</pairtime>
+					<starttime>07/28/2026 17:49:51</starttime>
+					<matches>
+						<match outcome="1">
+							<player1 userid="6100003"/>
+							<player2 userid="5737223"/>
+							<timestamp>07/28/2026 18:17:33</timestamp>
+							<tablenumber>1</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="1617337"/>
+							<player2 userid="5131808"/>
+							<timestamp>07/28/2026 17:57:05</timestamp>
+							<tablenumber>2</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="6366263"/>
+							<player2 userid="2120935"/>
+							<timestamp>07/28/2026 18:21:10</timestamp>
+							<tablenumber>3</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="5706225"/>
+							<player2 userid="747520"/>
+							<timestamp>07/28/2026 17:57:18</timestamp>
+							<tablenumber>4</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="209678"/>
+							<player2 userid="5768821"/>
+							<timestamp>07/28/2026 18:19:21</timestamp>
+							<tablenumber>5</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="6366264"/>
+							<player2 userid="5739759"/>
+							<timestamp>07/28/2026 18:09:37</timestamp>
+							<tablenumber>6</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="6323138"/>
+							<player2 userid="5159871"/>
+							<timestamp>07/28/2026 18:04:52</timestamp>
+							<tablenumber>7</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="5768993"/>
+							<player2 userid="4761859"/>
+							<timestamp>07/28/2026 17:50:06</timestamp>
+							<tablenumber>8</tablenumber>
+						</match>
+					</matches>
+				</round>
+				<round number="2" type="2" stage="6" >
+					<timeleft>0</timeleft>
+					<pairtime>07/28/2026 18:22:36</pairtime>
+					<starttime>07/28/2026 18:32:26</starttime>
+					<matches>
+						<match outcome="1">
+							<player1 userid="1617337"/>
+							<player2 userid="5739759"/>
+							<timestamp>07/28/2026 18:44:56</timestamp>
+							<tablenumber>1</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="6366263"/>
+							<player2 userid="6100003"/>
+							<timestamp>07/28/2026 18:52:37</timestamp>
+							<tablenumber>2</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="747520"/>
+							<player2 userid="5768821"/>
+							<timestamp>07/28/2026 18:53:24</timestamp>
+							<tablenumber>3</tablenumber>
+						</match>
+						<match outcome="3">
+							<player1 userid="5737223"/>
+							<player2 userid="6366264"/>
+							<timestamp>07/28/2026 19:04:10</timestamp>
+							<tablenumber>4</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="2120935"/>
+							<player2 userid="5706225"/>
+							<timestamp>07/28/2026 18:54:37</timestamp>
+							<tablenumber>5</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="209678"/>
+							<player2 userid="4761859"/>
+							<timestamp>07/28/2026 18:52:59</timestamp>
+							<tablenumber>6</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="5768993"/>
+							<player2 userid="6323138"/>
+							<timestamp>07/28/2026 18:32:33</timestamp>
+							<tablenumber>7</tablenumber>
+						</match>
+					</matches>
+				</round>
+				<round number="3" type="2" stage="8" >
+					<timeleft>0</timeleft>
+					<pairtime>07/28/2026 19:04:35</pairtime>
+					<starttime>07/28/2026 19:04:52</starttime>
+					<matches>
+						<match outcome="2">
+							<player1 userid="6100003"/>
+							<player2 userid="747520"/>
+							<timestamp>07/28/2026 19:33:22</timestamp>
+							<tablenumber>1</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="1617337"/>
+							<player2 userid="209678"/>
+							<timestamp>07/28/2026 19:44:02</timestamp>
+							<tablenumber>2</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="5739759"/>
+							<player2 userid="2120935"/>
+							<timestamp>07/28/2026 19:29:20</timestamp>
+							<tablenumber>3</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="5768821"/>
+							<player2 userid="6366264"/>
+							<timestamp>07/28/2026 19:25:53</timestamp>
+							<tablenumber>4</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="6323138"/>
+							<player2 userid="6366263"/>
+							<timestamp>07/28/2026 19:43:26</timestamp>
+							<tablenumber>5</tablenumber>
+						</match>
+						<match outcome="1">
+							<player1 userid="5706225"/>
+							<player2 userid="4761859"/>
+							<timestamp>07/28/2026 19:23:19</timestamp>
+							<tablenumber>6</tablenumber>
+						</match>
+						<match outcome="2">
+							<player1 userid="5768993"/>
+							<player2 userid="5737223"/>
+							<timestamp>07/28/2026 19:41:28</timestamp>
+							<tablenumber>7</tablenumber>
+						</match>
+					</matches>
+				</round>
+			</rounds>
+		</pod>
+	</pods>
+	<standings>
+		<pod category="2" type="finished">
+			<player id="747520" place="1" />
+			<player id="6100003" place="2" />
+			<player id="5768821" place="3" />
+			<player id="6366263" place="4" />
+			<player id="209678" place="5" />
+			<player id="2120935" place="6" />
+			<player id="1617337" place="7" />
+			<player id="5737223" place="8" />
+			<player id="5706225" place="9" />
+			<player id="5739759" place="10" />
+			<player id="6366264" place="11" />
+			<player id="5131808" place="12" />
+		</pod>
+		<pod category="2" type="dnf">
+		</pod>
+		<pod category="1" type="finished">
+			<player id="6323138" place="1" />
+		</pod>
+		<pod category="1" type="dnf">
+		</pod>
+		<pod category="0" type="finished">
+			<player id="5768993" place="1" />
+			<player id="5159871" place="2" />
+			<player id="4761859" place="3" />
+		</pod>
+		<pod category="0" type="dnf">
+		</pod>
+	</standings>
+	<finalsoptions>
+		<categorycut key="2">
+			<options>
+				<value>0</value>
+				<value>4</value>
+			</options>
+			<cut>0</cut>
+			<playercount>12</playercount>
+			<paired3rd4th>false</paired3rd4th>
+		</categorycut>
+		<categorycut key="1">
+			<options>
+				<value>0</value>
+			</options>
+			<cut>0</cut>
+			<playercount>1</playercount>
+			<paired3rd4th>false</paired3rd4th>
+		</categorycut>
+		<categorycut key="0">
+			<options>
+				<value>0</value>
+			</options>
+			<cut>0</cut>
+			<playercount>3</playercount>
+			<paired3rd4th>false</paired3rd4th>
+		</categorycut>
+	</finalsoptions>
+</tournament>
