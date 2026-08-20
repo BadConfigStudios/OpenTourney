@@ -740,7 +740,7 @@
           },
           "tiebreakers": {
             "items": {
-              "type": "number"
+              "$ref": "#/components/schemas/TiebreakValue"
             },
             "title": "Tiebreakers",
             "type": "array"
@@ -753,6 +753,30 @@
           "tiebreakers"
         ],
         "title": "StandingRowRead",
+        "type": "object"
+      },
+      "TiebreakValue": {
+        "properties": {
+          "format": {
+            "const": "percent",
+            "title": "Format",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "value",
+          "format"
+        ],
+        "title": "TiebreakValue",
         "type": "object"
       },
       "ValidationError": {

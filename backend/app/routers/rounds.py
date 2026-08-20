@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_pod_access, require_pod_organizer
 from app.auth.identity import Identity
 from app.db import get_db_session
-from app.formats.registry import get_tournament_format_or_422
 from app.models import Entry, Match, Pod, Round
+from app.ruleset import get_ruleset_or_422
 from app.schemas.round import RoundRead
 
 router = APIRouter(prefix="/pods/{pod_id}/rounds", tags=["rounds"])
@@ -31,7 +31,7 @@ def generate_round(
     if pod.completed_at is not None:
         raise HTTPException(status_code=409, detail="pod is already complete")
 
-    tournament_format = get_tournament_format_or_422(pod)
+    tournament_format = get_ruleset_or_422(pod).format
 
     entries = db.query(Entry).filter_by(pod_id=pod_id).order_by(Entry.id).all()
     if not entries:

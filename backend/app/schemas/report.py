@@ -1,13 +1,20 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel
+
+
+class TiebreakValue(BaseModel):
+    label: str
+    value: float
+    format: Literal["percent"]
 
 
 class StandingRowRead(BaseModel):
     entry_id: uuid.UUID
     points: int
     rank: int
-    tiebreakers: list[float]
+    tiebreakers: list[TiebreakValue]
 
 
 class PodReport(BaseModel):
