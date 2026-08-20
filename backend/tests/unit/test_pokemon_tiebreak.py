@@ -134,3 +134,56 @@ def test_entry_with_only_a_bye_gets_floor_not_zero_rounds_played_crash():
 
     assert tiebreaks[a.id][0] == pytest.approx(0.25)
     assert tiebreaks[a.id][1] == pytest.approx(0.25)
+
+
+def test_break_tie_returns_negative_one_when_entry_a_won():
+    a, b = _entry(), _entry()
+    round1 = _round(1, [_match(a, b, MatchResult.ENTRY1_WIN)])
+
+    result = PokemonTiebreak().break_tie(a.id, b.id, [round1])
+
+    assert result == -1
+
+
+def test_break_tie_returns_positive_one_when_entry_b_won():
+    a, b = _entry(), _entry()
+    round1 = _round(1, [_match(a, b, MatchResult.ENTRY2_WIN)])
+
+    result = PokemonTiebreak().break_tie(a.id, b.id, [round1])
+
+    assert result == 1
+
+
+def test_break_tie_is_order_independent():
+    a, b = _entry(), _entry()
+    round1 = _round(1, [_match(a, b, MatchResult.ENTRY1_WIN)])
+
+    assert PokemonTiebreak().break_tie(a.id, b.id, [round1]) == -1
+    assert PokemonTiebreak().break_tie(b.id, a.id, [round1]) == 1
+
+
+def test_break_tie_returns_none_when_the_shared_match_was_a_tie():
+    a, b = _entry(), _entry()
+    round1 = _round(1, [_match(a, b, MatchResult.TIE)])
+
+    result = PokemonTiebreak().break_tie(a.id, b.id, [round1])
+
+    assert result is None
+
+
+def test_break_tie_returns_none_when_they_never_played():
+    a, b, c = _entry(), _entry(), _entry()
+    round1 = _round(1, [_match(a, c, MatchResult.ENTRY1_WIN)])
+
+    result = PokemonTiebreak().break_tie(a.id, b.id, [round1])
+
+    assert result is None
+
+
+def test_break_tie_ignores_a_bye_match_between_unrelated_entries():
+    a, b = _entry(), _entry()
+    round1 = _round(1, [_match(a, None)])
+
+    result = PokemonTiebreak().break_tie(a.id, b.id, [round1])
+
+    assert result is None

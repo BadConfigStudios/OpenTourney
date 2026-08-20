@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 
-from app.models import Entry, Round
+from app.models import Entry, MatchResult, Round
 from app.tiebreak._shared import average, opponents_faced, points_and_rounds_played
 from app.tiebreak.base import TiebreakStrategy
 
@@ -62,4 +62,17 @@ class PokemonTiebreak(TiebreakStrategy):
     def break_tie(
         self, entry_a_id: uuid.UUID, entry_b_id: uuid.UUID, rounds: Sequence[Round]
     ) -> int | None:
-        return None  # implemented in Task 4
+        for round_ in rounds:
+            for match in round_.matches:
+                if match.entry2_id is None:
+                    continue
+                if {match.entry1_id, match.entry2_id} != {entry_a_id, entry_b_id}:
+                    continue
+                if match.result is MatchResult.ENTRY1_WIN:
+                    winner_id = match.entry1_id
+                elif match.result is MatchResult.ENTRY2_WIN:
+                    winner_id = match.entry2_id
+                else:
+                    return None
+                return -1 if winner_id == entry_a_id else 1
+        return None
