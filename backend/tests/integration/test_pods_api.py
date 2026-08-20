@@ -292,7 +292,7 @@ def test_create_pod_with_unknown_game_slug_is_rejected(api_client, make_token):
 
     response = api_client.post(
         "/pods",
-        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "not-a-real-game-123"},
         headers=_auth_headers(token),
     )
 
@@ -310,7 +310,7 @@ def test_update_pod_with_unknown_game_slug_is_rejected(api_client, make_token):
 
     response = api_client.patch(
         f"/pods/{pod_id}",
-        json={"format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        json={"format_slug": "swiss", "game_slug": "not-a-real-game-123"},
         headers=_auth_headers(token),
     )
 

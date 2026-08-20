@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { getEvent } from "../api/events";
 import { createPod, listPodsForEvent } from "../api/pods";
@@ -20,8 +21,10 @@ export function EventDetail() {
     queryFn: () => listPodsForEvent(apiFetch, eventId),
   });
 
+  const [gameSlug, setGameSlug] = useState("generic");
+
   const createPodMutation = useMutation({
-    mutationFn: () => createPod(apiFetch, eventId),
+    mutationFn: () => createPod(apiFetch, eventId, gameSlug),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", eventId] }),
   });
 
@@ -39,13 +42,24 @@ export function EventDetail() {
         <div className="mb-6">
           <p className="mb-2 text-sm text-gray-600">This event has no pod yet.</p>
           {isOrganizer && (
-            <button
-              onClick={() => createPodMutation.mutate()}
-              disabled={createPodMutation.isPending}
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white"
-            >
-              Create Pod
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                aria-label="Game"
+                value={gameSlug}
+                onChange={(event) => setGameSlug(event.target.value)}
+                className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+              >
+                <option value="generic">Generic</option>
+                <option value="pokemon-tcg">Pokémon TCG</option>
+              </select>
+              <button
+                onClick={() => createPodMutation.mutate()}
+                disabled={createPodMutation.isPending}
+                className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white"
+              >
+                Create Pod
+              </button>
+            </div>
           )}
         </div>
       )}

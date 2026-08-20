@@ -1,6 +1,6 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { server } from "../test/server";
 import { renderWithProviders } from "../test/renderWithProviders";
 import type { PersonaRole } from "../config/types";
@@ -32,6 +32,20 @@ function renderReport(role?: PersonaRole) {
 }
 
 describe("Report", () => {
+  beforeEach(() => {
+    server.use(
+      http.get("/pods/pod-1", () =>
+        HttpResponse.json({
+          id: "pod-1",
+          event_id: "event-1",
+          format_slug: "swiss",
+          game_slug: "generic",
+          completed_at: null,
+        }),
+      ),
+    );
+  });
+
   it("shows ranked standings with entry names and points", async () => {
     server.use(
       http.get("/pods/pod-1/report", () => HttpResponse.json(COMPLETE_REPORT)),
@@ -200,5 +214,37 @@ describe("Report", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "round 2 has an unreported match; cannot complete pod",
     );
+  });
+
+  it("shows a Bo1-by-default note for a Pokemon pod", async () => {
+    server.use(
+      http.get("/pods/pod-1", () =>
+        HttpResponse.json({
+          id: "pod-1",
+          event_id: "event-1",
+          format_slug: "swiss",
+          game_slug: "pokemon-tcg",
+          completed_at: null,
+        }),
+      ),
+      http.get("/pods/pod-1/report", () => HttpResponse.json(COMPLETE_REPORT)),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderReport();
+
+    expect(await screen.findByText(/best-of-1 by default/)).toBeInTheDocument();
+  });
+
+  it("hides the Bo1-by-default note for a non-Pokemon pod", async () => {
+    server.use(
+      http.get("/pods/pod-1/report", () => HttpResponse.json(COMPLETE_REPORT)),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderReport();
+    await screen.findByText("Ash");
+
+    expect(screen.queryByText(/best-of-1 by default/)).not.toBeInTheDocument();
   });
 });

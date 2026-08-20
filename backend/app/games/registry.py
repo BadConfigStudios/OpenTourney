@@ -1,8 +1,10 @@
 from app.games.base import GameModule
 from app.games.generic import GenericGameModule
+from app.games.pokemon import PokemonGameModule
 
 GAME_MODULES: dict[str, GameModule] = {
     "generic": GenericGameModule(),
+    "pokemon-tcg": PokemonGameModule(),
 }
 
 

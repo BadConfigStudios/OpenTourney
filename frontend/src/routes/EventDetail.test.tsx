@@ -55,6 +55,28 @@ describe("EventDetail", () => {
     expect(await screen.findByText("No entries yet.")).toBeInTheDocument();
   });
 
+  it("creates a pod with the selected game slug", async () => {
+    let pods: (typeof POD)[] = [];
+    const pokemonPod = { ...POD, game_slug: "pokemon-tcg" };
+    server.use(
+      http.get("/events/event-1", () => HttpResponse.json(EVENT)),
+      http.get("/pods", () => HttpResponse.json(pods)),
+      http.post("/pods", async ({ request }) => {
+        const body = await request.json();
+        expect(body).toEqual({ event_id: "event-1", format_slug: "swiss", game_slug: "pokemon-tcg" });
+        pods = [pokemonPod];
+        return HttpResponse.json(pokemonPod, { status: 201 });
+      }),
+      http.get("/entries", () => HttpResponse.json([])),
+    );
+
+    renderDetail();
+    fireEvent.change(await screen.findByLabelText("Game"), { target: { value: "pokemon-tcg" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Pod" }));
+
+    expect(await screen.findByText("No entries yet.")).toBeInTheDocument();
+  });
+
   it("renders the entry roster once a pod exists", async () => {
     server.use(
       http.get("/events/event-1", () => HttpResponse.json(EVENT)),

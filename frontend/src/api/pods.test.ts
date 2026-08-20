@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { completePod, createPod, listPodsForEvent } from "./pods";
+import { completePod, createPod, getPod, listPodsForEvent } from "./pods";
 
 function fetchReturning(body: unknown, status = 200) {
   return vi.fn().mockResolvedValue({ ok: true, status, json: () => Promise.resolve(body) });
@@ -19,18 +19,48 @@ describe("pods api", () => {
     expect(apiFetch).toHaveBeenCalledWith("/pods?event_id=e1", undefined);
   });
 
-  it("createPod POSTs the fixed swiss/generic slugs", async () => {
+  it("getPod GETs /pods/:id", async () => {
+    const apiFetch = fetchReturning({
+      id: "p1",
+      event_id: "e1",
+      format_slug: "swiss",
+      game_slug: "generic",
+      completed_at: null,
+    });
+
+    const pod = await getPod(apiFetch, "p1");
+
+    expect(pod.game_slug).toBe("generic");
+    expect(apiFetch).toHaveBeenCalledWith("/pods/p1", undefined);
+  });
+
+  it("createPod POSTs the given format/game slugs", async () => {
     const apiFetch = fetchReturning(
       { id: "p1", event_id: "e1", format_slug: "swiss", game_slug: "generic", completed_at: null },
       201,
     );
 
-    await createPod(apiFetch, "e1");
+    await createPod(apiFetch, "e1", "generic");
 
     expect(apiFetch).toHaveBeenCalledWith("/pods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event_id: "e1", format_slug: "swiss", game_slug: "generic" }),
+    });
+  });
+
+  it("createPod POSTs pokemon-tcg when that game slug is passed", async () => {
+    const apiFetch = fetchReturning(
+      { id: "p1", event_id: "e1", format_slug: "swiss", game_slug: "pokemon-tcg", completed_at: null },
+      201,
+    );
+
+    await createPod(apiFetch, "e1", "pokemon-tcg");
+
+    expect(apiFetch).toHaveBeenCalledWith("/pods", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_id: "e1", format_slug: "swiss", game_slug: "pokemon-tcg" }),
     });
   });
 

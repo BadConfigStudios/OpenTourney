@@ -130,13 +130,15 @@ def update_entry(
         db, identity, pod, "Organizer role required for this entry's pod's event"
     )
 
+    merged_metadata = {**entry.metadata_, **payload.metadata}
+
     game_module = _get_validated_game_module(pod)
     try:
-        game_module.validate_entry_metadata(payload.metadata)
+        game_module.validate_entry_metadata(merged_metadata)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    entry.metadata_ = payload.metadata
+    entry.metadata_ = merged_metadata
     db.commit()
     db.refresh(entry)
     return entry
