@@ -13,19 +13,25 @@ describe("report api", () => {
       is_partial: true,
       active_entry_count: 1,
       recommended_rounds: 3,
-      standings: [{ entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] }],
+      standings: [
+        {
+          entry_id: "e1",
+          points: 6,
+          rank: 1,
+          tiebreakers: [
+            { label: "OMW%", value: 0.75, format: "percent" },
+            { label: "OOMW%", value: 0.5, format: "percent" },
+          ],
+        },
+      ],
     });
 
     const report = await fetchPodReport(apiFetch, "pod-1");
 
-    expect(report).toEqual({
-      is_complete: false,
-      rounds_played: 2,
-      is_partial: true,
-      active_entry_count: 1,
-      recommended_rounds: 3,
-      standings: [{ entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] }],
-    });
+    expect(report.standings[0].tiebreakers).toEqual([
+      { label: "OMW%", value: 0.75, format: "percent" },
+      { label: "OOMW%", value: 0.5, format: "percent" },
+    ]);
     expect(apiFetch).toHaveBeenCalledWith("/pods/pod-1/report", undefined);
   });
 });

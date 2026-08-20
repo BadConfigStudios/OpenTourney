@@ -18,8 +18,24 @@ const COMPLETE_REPORT = {
   active_entry_count: 2,
   recommended_rounds: 3,
   standings: [
-    { entry_id: "e1", points: 6, rank: 1, tiebreakers: [0.75, 0.5] },
-    { entry_id: "e2", points: 3, rank: 2, tiebreakers: [0.415, 0.4] },
+    {
+      entry_id: "e1",
+      points: 6,
+      rank: 1,
+      tiebreakers: [
+        { label: "OMW%", value: 0.75, format: "percent" },
+        { label: "OOMW%", value: 0.5, format: "percent" },
+      ],
+    },
+    {
+      entry_id: "e2",
+      points: 3,
+      rank: 2,
+      tiebreakers: [
+        { label: "OMW%", value: 0.415, format: "percent" },
+        { label: "OOMW%", value: 0.4, format: "percent" },
+      ],
+    },
   ],
 };
 
@@ -64,7 +80,7 @@ describe("Report", () => {
     expect(rows[2]).toHaveTextContent("3");
   });
 
-  it("shows OMW%/OOMW% columns", async () => {
+  it("shows tiebreaker columns and values from the API response labels", async () => {
     server.use(
       http.get("/pods/pod-1/report", () => HttpResponse.json(COMPLETE_REPORT)),
       http.get("/entries", () => HttpResponse.json(ENTRIES)),
@@ -79,6 +95,39 @@ describe("Report", () => {
     expect(rows[1]).toHaveTextContent("50.0%");
     expect(rows[2]).toHaveTextContent("41.5%");
     expect(rows[2]).toHaveTextContent("40.0%");
+  });
+
+  it("renders Pokemon-labeled tiebreaker columns for a pokemon-tcg pod", async () => {
+    server.use(
+      http.get("/pods/pod-1", () =>
+        HttpResponse.json({
+          id: "pod-1",
+          event_id: "event-1",
+          format_slug: "swiss",
+          game_slug: "pokemon-tcg",
+          completed_at: null,
+        }),
+      ),
+      http.get("/pods/pod-1/report", () =>
+        HttpResponse.json({
+          ...COMPLETE_REPORT,
+          standings: COMPLETE_REPORT.standings.map((row) => ({
+            ...row,
+            tiebreakers: row.tiebreakers.map((tb, i) => ({
+              ...tb,
+              label: i === 0 ? "Op Win%" : "Op Op Win%",
+            })),
+          })),
+        }),
+      ),
+      http.get("/entries", () => HttpResponse.json(ENTRIES)),
+    );
+
+    renderReport();
+
+    const rows = await screen.findAllByRole("row");
+    expect(rows[0]).toHaveTextContent("Op Win%");
+    expect(rows[0]).toHaveTextContent("Op Op Win%");
   });
 
   it("shows a partial-round banner when is_partial is true", async () => {
