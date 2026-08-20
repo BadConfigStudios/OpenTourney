@@ -9,14 +9,29 @@ def points_and_rounds_played(
     win_points: int,
     tie_points: int,
     loss_points: int,
-    bye_rounds_played: bool = True,
+    include_bye: bool = True,
 ) -> tuple[dict[uuid.UUID, int], dict[uuid.UUID, int]]:
     """Tally match points and rounds-played per entry across `rounds`.
 
-    `bye_rounds_played` controls whether a bye round counts toward the
-    recipient's rounds-played denominator: `True` for MTG-style own-MWP
-    (OwpOomwTiebreak), `False` for Pokémon's own win% (PokemonTiebreak,
-    handbook §5.6.1 — a bye counts as a win but not a played round).
+    `include_bye` controls whether a bye round contributes to the
+    recipient's points numerator *and* rounds-played denominator for the
+    purposes of this specific win%/MWP figure:
+
+    - `True` (default, used by `OwpOomwTiebreak`): the existing MTG-style
+      behavior — a bye is a normal played win, contributing `win_points`
+      to the numerator and one round to the denominator, unaffected by
+      this parameter's introduction.
+    - `False` (used by `PokemonTiebreak`): a bye contributes to *neither*
+      the numerator nor the denominator of the own-win% figure used as an
+      input to *other* competitors' Op Win%/Op Op Win% averages — i.e.
+      only the entry's actually-played (non-bye) rounds count toward this
+      figure. This does NOT affect the entry's own primary standings
+      points (see `app.formats.swiss._compute_standings`, which still
+      counts a bye as a win for ranking purposes) — it is scoped entirely
+      to the tiebreak-value calculation. This was empirically corrected
+      against real Tournament Operations Manager (TOM) tournament data
+      during Phase 18 implementation; see
+      docs/pokemon-tiebreak-research.md §3 for the full reconciliation.
     """
     points: dict[uuid.UUID, int] = {}
     rounds_played: dict[uuid.UUID, int] = {}
@@ -24,8 +39,8 @@ def points_and_rounds_played(
     for round_ in rounds:
         for match in round_.matches:
             if match.entry2_id is None:
-                points[match.entry1_id] = points.get(match.entry1_id, 0) + win_points
-                if bye_rounds_played:
+                if include_bye:
+                    points[match.entry1_id] = points.get(match.entry1_id, 0) + win_points
                     rounds_played[match.entry1_id] = rounds_played.get(match.entry1_id, 0) + 1
                 continue
 

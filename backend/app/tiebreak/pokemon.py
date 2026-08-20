@@ -27,7 +27,7 @@ class PokemonTiebreak(TiebreakStrategy):
             self.win_points,
             self.tie_points,
             self.loss_points,
-            bye_rounds_played=False,
+            include_bye=False,
         )
         opponents = opponents_faced(rounds)
         dropped = {entry.id: entry.dropped_at_round is not None for entry in entries}

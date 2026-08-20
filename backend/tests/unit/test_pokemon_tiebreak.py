@@ -73,21 +73,53 @@ def test_dropped_entry_caps_at_75_percent_even_at_a_perfect_record():
     assert tiebreaks[b.id][0] == pytest.approx(0.75)
 
 
-def test_bye_round_excluded_from_denominator_but_counts_as_a_win():
+def test_bye_round_contributes_to_neither_numerator_nor_denominator():
     a, b, c = _entry(), _entry(), _entry()
     round1 = _round(1, [_match(a, None), _match(b, c, MatchResult.ENTRY1_WIN)])
     round2 = _round(2, [_match(a, b, MatchResult.ENTRY1_WIN)])
 
     tiebreaks = PokemonTiebreak().compute([a, b, c], [round1, round2])
 
-    # a's own record: bye (win, round excluded from denominator) + round2
-    # win vs b = 2 wins / 1 round played (only round2 counts) = 1.0, capped
-    # at 1.0. a's only *opponent* across both rounds is b (round2) -- the
-    # bye round never adds a phantom opponent (matches OwpOomw's rule).
-    # b's own win%: 0 wins (round1 win vs c, round2 loss vs a) = 1 win / 2
-    # rounds played = 0.5.
+    # a's own record under interpretation C: the round1 bye contributes to
+    # neither the points numerator nor the rounds-played denominator; only
+    # round2's win vs b counts: 3 pts / (3 * 1 round played) = 1.0, capped
+    # at 1.0. That happens to be the same numeric result the old,
+    # incorrect interpretation A would have produced here (a's raw value
+    # saturates the cap under both readings) -- this test does NOT
+    # discriminate between the two interpretations; see
+    # test_bye_round_excluded_from_own_win_pct_entirely below for a
+    # non-saturating case that does. a's only real *opponent* across both
+    # rounds is b (round2) -- the bye round never adds a phantom opponent
+    # (matches OwpOomw's rule).
+    #
+    # This assertion actually observes b's own win%, not a's: b went 1-1
+    # (round1 win vs c, round2 loss vs a) = 3 pts / (3 * 2 rounds played)
+    # = 0.5, and a's only opponent is b, so Op Win%(a) reads that value
+    # directly.
     b_own_win_pct = 0.5
     assert tiebreaks[a.id][0] == pytest.approx(b_own_win_pct)
+
+
+def test_bye_round_excluded_from_own_win_pct_entirely():
+    a, b = _entry(), _entry()
+    round1 = _round(1, [_match(a, None)])
+    round2 = _round(2, [_match(a, b, MatchResult.ENTRY2_WIN)])  # b beats a
+
+    tiebreaks = PokemonTiebreak().compute([a, b], [round1, round2])
+
+    # a's own win% under interpretation C: the round1 bye contributes to
+    # neither the numerator nor the denominator; only round2 (a loss to
+    # b) counts -> 0 pts / (3 * 1 round played) = 0.0, floored to 0.25.
+    # b's only opponent is a, so Op Win%(b) reads a's own win% directly.
+    #
+    # This is decisive between interpretations: under the old (incorrect)
+    # interpretation A -- bye counted as a win in the numerator, excluded
+    # only from the denominator -- a's own win% would have been
+    # 3 pts (bye win) + 0 pts (round2 loss) / (3 * 1 round played) = 1.0,
+    # capped at 1.0, not 0.25. Confirmed via RED/GREEN: this test fails
+    # under the reverted (interpretation A) `_shared.py` logic and passes
+    # under the corrected (interpretation C) logic.
+    assert tiebreaks[b.id][0] == pytest.approx(0.25)
 
 
 def test_op_op_win_pct_averages_opponents_op_win_pct():
