@@ -1,3 +1,4 @@
+import itertools
 from collections.abc import Sequence
 
 from app.formats.base import Pairing, StandingRow, TournamentFormat
@@ -32,7 +33,9 @@ class SwissFormat(TournamentFormat):
         standings, bye_used = _compute_standings(entries, previous_rounds)
         tiebreaks = self.tiebreak.compute(entries, previous_rounds)
         already_paired = _paired_history(previous_rounds)
-        ranked = _rank_entries(active_entries, standings, tiebreaks)
+        ranked = _rank_entries(
+            active_entries, standings, tiebreaks, self.tiebreak, previous_rounds
+        )
 
         bye_entry = None
         if len(ranked) % 2 == 1:
@@ -50,7 +53,7 @@ class SwissFormat(TournamentFormat):
     ) -> list[StandingRow]:
         standings, _ = _compute_standings(entries, rounds)
         tiebreaks = self.tiebreak.compute(entries, rounds)
-        ranked = _rank_entries(entries, standings, tiebreaks)
+        ranked = _rank_entries(entries, standings, tiebreaks, self.tiebreak, rounds)
         return [
             StandingRow(
                 entry_id=entry.id,
@@ -100,8 +103,14 @@ def _paired_history(previous_rounds: Sequence[Round]) -> set:
     return paired
 
 
-def _rank_entries(entries: Sequence[Entry], standings: dict, tiebreaks: dict) -> list:
-    return sorted(
+def _rank_entries(
+    entries: Sequence[Entry],
+    standings: dict,
+    tiebreaks: dict,
+    tiebreak: TiebreakStrategy,
+    rounds: Sequence[Round],
+) -> list:
+    sorted_entries = sorted(
         entries,
         key=lambda entry: (
             -standings.get(entry.id, 0),
@@ -109,6 +118,21 @@ def _rank_entries(entries: Sequence[Entry], standings: dict, tiebreaks: dict) ->
             str(entry.id),
         ),
     )
+
+    ranked: list = []
+    for _, group_iter in itertools.groupby(
+        sorted_entries,
+        key=lambda entry: (standings.get(entry.id, 0), tiebreaks.get(entry.id, ())),
+    ):
+        group = list(group_iter)
+        if len(group) == 2:
+            entry_a, entry_b = group
+            result = tiebreak.break_tie(entry_a.id, entry_b.id, rounds)
+            if result == 1:
+                group = [entry_b, entry_a]
+        ranked.extend(group)
+
+    return ranked
 
 
 def _select_bye_entry(ranked: list, bye_used: set):

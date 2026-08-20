@@ -14,13 +14,13 @@ from app.auth.dependencies import (
 )
 from app.auth.identity import Identity
 from app.db import get_db_session
-from app.formats.registry import get_tournament_format_or_422
 from app.formats.round_target import recommended_rounds
 from app.games.registry import get_game_module
 from app.models import Entry, Match, MatchResult, Pod, Round
 from app.models.rbac import PodRole
+from app.ruleset import get_ruleset_or_422
 from app.schemas.pod import PodCreate, PodRead, PodUpdate
-from app.schemas.report import PodReport, StandingRowRead
+from app.schemas.report import PodReport, StandingRowRead, TiebreakValue
 
 router = APIRouter(prefix="/pods", tags=["pods"])
 
@@ -157,7 +157,8 @@ def get_pod_report(
     if pod is None:
         raise HTTPException(status_code=404, detail="pod not found")
 
-    tournament_format = get_tournament_format_or_422(pod)
+    ruleset = get_ruleset_or_422(pod)
+    tournament_format = ruleset.format
 
     all_entries = db.query(Entry).filter_by(pod_id=pod_id).order_by(Entry.id).all()
     all_rounds = db.query(Round).filter_by(pod_id=pod_id).order_by(Round.number).all()
@@ -174,6 +175,7 @@ def get_pod_report(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     active_entry_count = sum(1 for entry in all_entries if entry.dropped_at_round is None)
+    labels = tournament_format.tiebreak.labels()
 
     return PodReport(
         is_complete=pod.completed_at is not None,
@@ -186,7 +188,10 @@ def get_pod_report(
                 entry_id=row.entry_id,
                 points=row.points,
                 rank=row.rank,
-                tiebreakers=list(row.tiebreakers),
+                tiebreakers=[
+                    TiebreakValue(label=label, value=value, format="percent")
+                    for label, value in zip(labels, row.tiebreakers, strict=True)
+                ],
             )
             for row in standings
         ],

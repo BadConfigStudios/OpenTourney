@@ -94,8 +94,11 @@ export function Report() {
                   <th className="py-1 pr-4">Rank</th>
                   <th className="py-1 pr-4">Entry</th>
                   <th className="py-1 pr-4">Points</th>
-                  <th className="py-1 pr-4">OMW%</th>
-                  <th className="py-1">OOMW%</th>
+                  {report.standings[0].tiebreakers.map((tb) => (
+                    <th key={tb.label} className="py-1 pr-4">
+                      {tb.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -104,8 +107,11 @@ export function Report() {
                     <td className="py-1 pr-4">{row.rank}</td>
                     <td className="py-1 pr-4">{displayNameFor(entriesQuery.data, row.entry_id)}</td>
                     <td className="py-1 pr-4">{row.points}</td>
-                    <td className="py-1 pr-4">{(row.tiebreakers[0] * 100).toFixed(1)}%</td>
-                    <td className="py-1">{(row.tiebreakers[1] * 100).toFixed(1)}%</td>
+                    {row.tiebreakers.map((tb) => (
+                      <td key={tb.label} className="py-1 pr-4">
+                        {(tb.value * 100).toFixed(1)}%
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

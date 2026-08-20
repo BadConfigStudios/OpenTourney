@@ -3,6 +3,8 @@ import pytest
 from app.games.base import GameModule
 from app.games.generic import GenericGameModule
 from app.games.pokemon import PokemonGameModule
+from app.tiebreak.owp_oomw import OwpOomwTiebreak
+from app.tiebreak.pokemon import PokemonTiebreak
 
 
 def test_game_module_is_abstract():
@@ -137,3 +139,20 @@ def test_pokemon_match_points_match_handbook_defaults():
     assert PokemonGameModule.WIN_POINTS == 3
     assert PokemonGameModule.TIE_POINTS == 1
     assert PokemonGameModule.LOSS_POINTS == 0
+
+
+def test_generic_game_module_tiebreak_strategy_is_owp_oomw():
+    strategy = GenericGameModule().tiebreak_strategy()
+
+    assert isinstance(strategy, OwpOomwTiebreak)
+    assert strategy.labels() == ("OMW%", "OOMW%")
+
+
+def test_pokemon_game_module_tiebreak_strategy_is_pokemon_tiebreak():
+    strategy = PokemonGameModule().tiebreak_strategy()
+
+    assert isinstance(strategy, PokemonTiebreak)
+    assert strategy.labels() == ("Op Win%", "Op Op Win%")
+    assert strategy.win_points == PokemonGameModule.WIN_POINTS
+    assert strategy.tie_points == PokemonGameModule.TIE_POINTS
+    assert strategy.loss_points == PokemonGameModule.LOSS_POINTS

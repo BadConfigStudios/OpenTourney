@@ -5,6 +5,18 @@ MVP tag. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en
 
 ## [Unreleased]
 
+### Added
+
+- Pokémon tiebreak strategy: Op Win%/Op Op Win% chain with 25% floor,
+  100%/75% completed-vs-dropped cap, and bye-denominator handling per the
+  Play! Pokémon Tournament Rules Handbook, plus a head-to-head pairwise
+  fallback tiebreaker, both behind the existing pluggable
+  `TiebreakStrategy` interface (Phase 18, FR28/FR29)
+- Labeled, typed tiebreaker wire contract (`{label, value, format}` per
+  entry) replacing the bare unlabeled `list[float]`, so the Report screen
+  renders the correct column headers for whichever game a pod is running
+  (Phase 18, closes #57)
+
 ## [0.1.0] — MVP1: Core In-Person Swiss Engine
 
 Serves BR1-BR4 / FR1-23, FR25-26. Full Build Order: phases 1-9.

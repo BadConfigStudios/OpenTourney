@@ -1,6 +1,8 @@
 from urllib.parse import urlsplit
 
 from app.games.base import GameModule
+from app.tiebreak.base import TiebreakStrategy
+from app.tiebreak.pokemon import PokemonTiebreak
 
 _DECKLIST_URL_ERROR = (
     "decklist_url must be an https://my.limitlesstcg.com/shared/<id> or "
@@ -18,8 +20,8 @@ class PokemonGameModule(GameModule):
 
     Descriptive only -- no rules enforcement. Bo1-by-default reporting is
     organizer discretion per the Play! Pokemon Tournament Rules Handbook
-    S5.5.6. Match points below match handbook S5.3.2 and are not wired into
-    the pairing/scoring engine yet (see Phase 18, FR28/FR29).
+    S5.5.6. Match points below match handbook S5.3.2 and drive
+    PokemonTiebreak's Op Win%/Op Op Win% chain (Phase 18, FR28/FR29).
     """
 
     slug = "pokemon-tcg"
@@ -62,3 +64,8 @@ class PokemonGameModule(GameModule):
         # Reject URLs with query strings or fragments
         if parts.query or parts.fragment:
             raise ValueError(_DECKLIST_URL_ERROR)
+
+    def tiebreak_strategy(self) -> TiebreakStrategy:
+        return PokemonTiebreak(
+            win_points=self.WIN_POINTS, tie_points=self.TIE_POINTS, loss_points=self.LOSS_POINTS
+        )

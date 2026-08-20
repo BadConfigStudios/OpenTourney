@@ -347,6 +347,7 @@ def test_compute_standings_method_raises_on_unreported_match():
 
 def test_rank_entries_orders_by_points_then_tiebreak_then_uuid():
     from app.formats.swiss import _rank_entries
+    from app.tiebreak.owp_oomw import OwpOomwTiebreak
 
     e_low_points, e_high_tiebreak, e_low_tiebreak, e_tied_a, e_tied_b = (
         _entry(),
@@ -374,6 +375,8 @@ def test_rank_entries_orders_by_points_then_tiebreak_then_uuid():
         [e_low_points, e_high_tiebreak, e_low_tiebreak, e_tied_a, e_tied_b],
         standings,
         tiebreaks,
+        OwpOomwTiebreak(),
+        rounds=[],
     )
 
     # e_tied_a/e_tied_b (6 pts) rank above e_high_tiebreak/e_low_tiebreak
@@ -384,9 +387,74 @@ def test_rank_entries_orders_by_points_then_tiebreak_then_uuid():
     assert ranked[3].id == e_low_tiebreak.id
     # e_low_points is last regardless of its (unused) high tiebreak value.
     assert ranked[4].id == e_low_points.id
-    # e_tied_a/e_tied_b are tied on both points AND tiebreak -- UUID string
-    # order is the last-resort fallback.
+    # e_tied_a/e_tied_b are tied on both points AND tiebreak -- OwpOomwTiebreak
+    # has no break_tie(), so UUID string order is the last-resort fallback.
     assert [r.id for r in ranked[:2]] == sorted([e_tied_a.id, e_tied_b.id], key=str)
+
+
+def test_rank_entries_uses_break_tie_for_exactly_two_tied_entries():
+    from app.formats.swiss import _rank_entries
+
+    e_winner, e_loser = _entry(), _entry()
+    standings = {e_winner.id: 3, e_loser.id: 3}
+    tiebreaks = {e_winner.id: (0.5, 0.5), e_loser.id: (0.5, 0.5)}
+    match = Match(
+        id=uuid.uuid4(),
+        round_id=uuid.uuid4(),
+        entry1_id=e_loser.id,
+        entry2_id=e_winner.id,
+        result=MatchResult.ENTRY2_WIN,
+    )
+    round1 = _round(1, [match])
+
+    class _StubTiebreak:
+        def break_tie(self, entry_a_id, entry_b_id, rounds):
+            # entry_a_id/entry_b_id arrive in _rank_entries' internal
+            # group order; assert head-to-head result regardless of order.
+            if entry_a_id == e_winner.id:
+                return -1
+            return 1
+
+    ranked = _rank_entries(
+        [e_winner, e_loser], standings, tiebreaks, _StubTiebreak(), rounds=[round1]
+    )
+
+    assert ranked[0].id == e_winner.id
+    assert ranked[1].id == e_loser.id
+
+
+def test_rank_entries_falls_back_to_uuid_order_when_break_tie_returns_none():
+    from app.formats.swiss import _rank_entries
+
+    e_a, e_b = _entry(), _entry()
+    standings = {e_a.id: 3, e_b.id: 3}
+    tiebreaks = {e_a.id: (0.5, 0.5), e_b.id: (0.5, 0.5)}
+
+    class _StubTiebreak:
+        def break_tie(self, entry_a_id, entry_b_id, rounds):
+            return None
+
+    ranked = _rank_entries([e_a, e_b], standings, tiebreaks, _StubTiebreak(), rounds=[])
+
+    assert [r.id for r in ranked] == sorted([e_a.id, e_b.id], key=str)
+
+
+def test_rank_entries_never_calls_break_tie_for_a_three_way_tie():
+    from app.formats.swiss import _rank_entries
+
+    e_a, e_b, e_c = _entry(), _entry(), _entry()
+    standings = {e_a.id: 3, e_b.id: 3, e_c.id: 3}
+    tiebreaks = {e_a.id: (0.5, 0.5), e_b.id: (0.5, 0.5), e_c.id: (0.5, 0.5)}
+
+    class _ExplodingTiebreak:
+        def break_tie(self, entry_a_id, entry_b_id, rounds):
+            raise AssertionError("break_tie must not be called for a 3+ way tie")
+
+    ranked = _rank_entries(
+        [e_a, e_b, e_c], standings, tiebreaks, _ExplodingTiebreak(), rounds=[]
+    )
+
+    assert [r.id for r in ranked] == sorted([e_a.id, e_b.id, e_c.id], key=str)
 
 
 def test_generate_round_excludes_dropped_entries_from_round_one():

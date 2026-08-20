@@ -122,6 +122,37 @@ def test_report_ranks_by_omw_when_match_points_tie(api_client, make_token):
     # rank it above l1 despite the equal points.
     assert standings[w1]["points"] == standings[l1]["points"] == 3
     assert len(standings[w1]["tiebreakers"]) == 2
-    assert standings[w1]["tiebreakers"][0] == pytest.approx(0.75)
-    assert standings[l1]["tiebreakers"][0] == pytest.approx(0.415)
+    assert standings[w1]["tiebreakers"][0]["label"] == "OMW%"
+    assert standings[w1]["tiebreakers"][0]["value"] == pytest.approx(0.75)
+    assert standings[w1]["tiebreakers"][0]["format"] == "percent"
+    assert standings[l1]["tiebreakers"][0]["value"] == pytest.approx(0.415)
     assert standings[w1]["rank"] < standings[l1]["rank"]
+
+
+def test_report_labels_tiebreakers_per_game_module(api_client, make_token):
+    """A pokemon-tcg pod's report uses PokemonTiebreak's labels; a generic
+    pod's report uses OwpOomwTiebreak's labels -- proves get_ruleset_or_422
+    resolves the game-specific strategy at the report call site (#57)."""
+    token = make_token(player_uuid=uuid.uuid4(), roles=["organizer"])
+    org_id = api_client.post(
+        "/organizations", json={"name": "Test Org"}, headers=_auth_headers(token)
+    ).json()["id"]
+    event_id = api_client.post(
+        "/events",
+        json={"date": "2026-09-01", "name": "Test Event", "organization_id": org_id},
+        headers=_auth_headers(token),
+    ).json()["id"]
+    pod_id = api_client.post(
+        "/pods",
+        json={"event_id": event_id, "format_slug": "swiss", "game_slug": "pokemon-tcg"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+    for _ in range(2):
+        _add_entry(api_client, token, pod_id)
+    api_client.post(f"/pods/{pod_id}/rounds", headers=_auth_headers(token))
+
+    report = api_client.get(f"/pods/{pod_id}/report", headers=_auth_headers(token)).json()
+
+    labels = [tb["label"] for tb in report["standings"][0]["tiebreakers"]]
+    assert labels == ["Op Win%", "Op Op Win%"]
+    assert all(tb["format"] == "percent" for tb in report["standings"][0]["tiebreakers"])

@@ -1,10 +1,16 @@
 import { apiRequest, type ApiFetch } from "./request";
 
+export interface TiebreakValue {
+  label: string;
+  value: number;
+  format: "percent";
+}
+
 export interface StandingRow {
   entry_id: string;
   points: number;
   rank: number;
-  tiebreakers: number[];
+  tiebreakers: TiebreakValue[];
 }
 
 export interface PodReport {
