@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 
-from app.models import Entry, MatchResult, Round
+from app.models import Entry, Round
 from app.tiebreak._shared import average, opponents_faced, points_and_rounds_played
 from app.tiebreak.base import TiebreakStrategy
 
